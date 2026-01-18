@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>担当者別稼働状況 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .progress-bar {
+            transition: width 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+    <!-- ヘッダー -->
+    <header class="bg-white border-b border-slate-200 px-6 py-4">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center">
+                <a href="index.html" class="text-slate-500 hover:text-slate-700 mr-4">
+                    <i class="fas fa-arrow-left"></i>
+                </a>
+                <h1 class="text-xl font-bold text-slate-800">
+                    <i class="fas fa-users text-blue-500 mr-2"></i>担当者別稼働状況
+                </h1>
+            </div>
+            <div class="flex items-center space-x-4">
+                <span class="text-sm text-slate-500">全プロジェクト横断表示</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- メインコンテンツ -->
+    <main class="p-6">
+        <!-- サマリーカード -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-xl p-4 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500">総担当者数</p>
+                        <p class="text-2xl font-bold text-slate-800" id="total-assignees">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-users text-blue-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500">総プロジェクト数</p>
+                        <p class="text-2xl font-bold text-slate-800" id="total-projects">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-folder text-purple-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500">総タスク数</p>
+                        <p class="text-2xl font-bold text-slate-800" id="total-tasks">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-tasks text-emerald-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 card-shadow">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-sm text-slate-500">総工数</p>
+                        <p class="text-2xl font-bold text-slate-800" id="total-man-days">-</p>
+                    </div>
+                    <div class="w-12 h-12 bg-amber-100 rounded-full flex items-center justify-center">
+                        <i class="fas fa-calendar-day text-amber-500 text-xl"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 担当者カード一覧 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6" id="assignee-cards">
+            <!-- 動的に生成 -->
+        </div>
+    </main>
+
+    <script>
+        // 担当者カラー設定
+        var ASSIGNEE_COLORS = {
+            '山田': 'from-blue-400 to-indigo-500',
+            '佐藤': 'from-purple-400 to-pink-500',
+            '鈴木': 'from-cyan-400 to-blue-500',
+            '田中': 'from-orange-400 to-red-500',
+            '高橋': 'from-teal-400 to-cyan-500'
+        };
+
+        // プロジェクトデータ
+        var allProjectsData = {
+            '1': { name: 'ECサイトリニューアル', customer: '株式会社ABC商事', color: '#3b82f6' },
+            '2': { name: '基幹システム更新', customer: '株式会社ABC商事', color: '#8b5cf6' },
+            '3': { name: '社内業務システム開発', customer: 'XYZ株式会社', color: '#10b981' },
+            '4': { name: '勤怠管理システム', customer: 'XYZ株式会社', color: '#f59e0b' },
+            '5': { name: 'モバイルアプリ開発', customer: '株式会社テックソリューション', color: '#ef4444' },
+            '6': { name: '在庫管理システム', customer: 'グローバルトレード株式会社', color: '#06b6d4' },
+            '7': { name: '受発注システム改修', customer: 'グローバルトレード株式会社', color: '#ec4899' }
+        };
+
+        // タスクデータ
+        var allProjectsTaskData = [
+            // プロジェクト1: ECサイトリニューアル
+            { id: 1011, projectId: '1', name: 'ヒアリング', assignee: '山田', manDays: 3, progress: 100, planStart: '01/06', planEnd: '01/08' },
+            { id: 1012, projectId: '1', name: '要件書作成', assignee: '山田', manDays: 5, progress: 100, planStart: '01/09', planEnd: '01/15' },
+            { id: 1013, projectId: '1', name: 'レビュー', assignee: '佐藤', manDays: 2, progress: 100, planStart: '01/16', planEnd: '01/17' },
+            { id: 1021, projectId: '1', name: '画面設計', assignee: '佐藤', manDays: 5, progress: 100, planStart: '01/20', planEnd: '01/24' },
+            { id: 1022, projectId: '1', name: 'DB設計', assignee: '鈴木', manDays: 5, progress: 60, planStart: '01/27', planEnd: '01/31' },
+            { id: 1023, projectId: '1', name: 'API設計', assignee: '鈴木', manDays: 5, progress: 0, planStart: '02/03', planEnd: '02/07' },
+            { id: 1031, projectId: '1', name: 'フロントエンド', assignee: '田中', manDays: 15, progress: 0, planStart: '02/10', planEnd: '02/28' },
+            { id: 1032, projectId: '1', name: 'バックエンド', assignee: '鈴木', manDays: 15, progress: 0, planStart: '02/10', planEnd: '03/14' },
+
+            // プロジェクト2: 基幹システム更新
+            { id: 2011, projectId: '2', name: '業務フロー分析', assignee: '田中', manDays: 4, progress: 100, planStart: '01/13', planEnd: '01/16' },
+            { id: 2012, projectId: '2', name: 'システム調査', assignee: '高橋', manDays: 4, progress: 100, planStart: '01/20', planEnd: '01/24' },
+            { id: 2021, projectId: '2', name: 'テーブル設計', assignee: '高橋', manDays: 6, progress: 80, planStart: '01/27', planEnd: '02/03' },
+            { id: 2022, projectId: '2', name: '移行計画', assignee: '田中', manDays: 6, progress: 0, planStart: '02/05', planEnd: '02/14' },
+
+            // プロジェクト3: 社内業務システム開発
+            { id: 3011, projectId: '3', name: 'ワイヤーフレーム', assignee: '山田', manDays: 5, progress: 100, planStart: '01/06', planEnd: '01/10' },
+            { id: 3012, projectId: '3', name: 'デザイン', assignee: '佐藤', manDays: 5, progress: 100, planStart: '01/13', planEnd: '01/17' },
+            { id: 3021, projectId: '3', name: '認証API', assignee: '鈴木', manDays: 5, progress: 100, planStart: '01/20', planEnd: '01/24' },
+            { id: 3022, projectId: '3', name: '業務API', assignee: '鈴木', manDays: 10, progress: 80, planStart: '01/27', planEnd: '02/07' },
+            { id: 3023, projectId: '3', name: 'レポートAPI', assignee: '田中', manDays: 5, progress: 0, planStart: '02/10', planEnd: '02/14' },
+
+            // プロジェクト4: 勤怠管理システム
+            { id: 4011, projectId: '4', name: '現場ヒアリング', assignee: '佐藤', manDays: 3, progress: 100, planStart: '01/20', planEnd: '01/22' },
+            { id: 4012, projectId: '4', name: '要件まとめ', assignee: '佐藤', manDays: 2, progress: 100, planStart: '01/23', planEnd: '01/24' },
+            { id: 4021, projectId: '4', name: '打刻機能', assignee: '田中', manDays: 5, progress: 100, planStart: '01/27', planEnd: '01/31' },
+            { id: 4022, projectId: '4', name: '集計機能', assignee: '田中', manDays: 5, progress: 0, planStart: '02/03', planEnd: '02/07' },
+
+            // プロジェクト5: モバイルアプリ開発
+            { id: 5011, projectId: '5', name: 'ユーザー調査', assignee: '高橋', manDays: 5, progress: 100, planStart: '01/06', planEnd: '01/10' },
+            { id: 5012, projectId: '5', name: 'UIデザイン', assignee: '高橋', manDays: 7, progress: 80, planStart: '01/13', planEnd: '01/21' },
+            { id: 5013, projectId: '5', name: 'プロトタイプ', assignee: '山田', manDays: 3, progress: 0, planStart: '01/22', planEnd: '01/24' },
+            { id: 5021, projectId: '5', name: '基本機能実装', assignee: '鈴木', manDays: 15, progress: 0, planStart: '01/27', planEnd: '02/14' },
+            { id: 5022, projectId: '5', name: 'テスト・調整', assignee: '鈴木', manDays: 10, progress: 0, planStart: '02/17', planEnd: '02/28' },
+        ];
+
+        // 担当者別サマリーを計算
+        function calculateAssigneeSummary() {
+            var summary = {};
+            var totalTasks = 0;
+            var totalManDays = 0;
+
+            allProjectsTaskData.forEach(function(task) {
+                if (task.assignee === '-') return;
+
+                totalTasks++;
+                totalManDays += task.manDays;
+
+                var assignee = task.assignee;
+                var projectId = task.projectId;
+                var project = allProjectsData[projectId];
+                if (!project) return;
+
+                if (!summary[assignee]) {
+                    summary[assignee] = {
+                        totalDays: 0,
+                        completedDays: 0,
+                        inProgressDays: 0,
+                        pendingDays: 0,
+                        projects: {},
+                        customers: {},
+                        tasks: []
+                    };
+                }
+
+                summary[assignee].totalDays += task.manDays;
+
+                // 進捗状況で分類
+                if (task.progress === 100) {
+                    summary[assignee].completedDays += task.manDays;
+                } else if (task.progress > 0) {
+                    summary[assignee].inProgressDays += task.manDays;
+                } else {
+                    summary[assignee].pendingDays += task.manDays;
+                }
+
+                // プロジェクト別
+                if (!summary[assignee].projects[projectId]) {
+                    summary[assignee].projects[projectId] = {
+                        name: project.name,
+                        customer: project.customer,
+                        color: project.color,
+                        days: 0,
+                        tasks: []
+                    };
+                }
+                summary[assignee].projects[projectId].days += task.manDays;
+                summary[assignee].projects[projectId].tasks.push(task);
+
+                // 顧客別
+                var customer = project.customer;
+                if (!summary[assignee].customers[customer]) {
+                    summary[assignee].customers[customer] = 0;
+                }
+                summary[assignee].customers[customer] += task.manDays;
+
+                summary[assignee].tasks.push(task);
+            });
+
+            return {
+                assignees: summary,
+                totalTasks: totalTasks,
+                totalManDays: totalManDays
+            };
+        }
+
+        // 担当者カードを生成
+        function generateAssigneeCards() {
+            var data = calculateAssigneeSummary();
+            var summary = data.assignees;
+
+            // サマリーカードを更新
+            $('#total-assignees').text(Object.keys(summary).length + '名');
+            $('#total-projects').text(Object.keys(allProjectsData).length + '件');
+            $('#total-tasks').text(data.totalTasks + '件');
+            $('#total-man-days').text(data.totalManDays + '日');
+
+            var $container = $('#assignee-cards');
+            $container.empty();
+
+            Object.keys(summary).sort().forEach(function(assignee) {
+                var info = summary[assignee];
+                var assigneeColor = ASSIGNEE_COLORS[assignee] || 'from-gray-400 to-gray-500';
+
+                var completedPercent = Math.round((info.completedDays / info.totalDays) * 100);
+                var inProgressPercent = Math.round((info.inProgressDays / info.totalDays) * 100);
+
+                var cardHtml = '<div class="bg-white rounded-xl card-shadow-lg overflow-hidden">' +
+                    // ヘッダー
+                    '<div class="bg-gradient-to-r ' + assigneeColor + ' p-4">' +
+                        '<div class="flex items-center">' +
+                            '<div class="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center mr-4">' +
+                                '<i class="fas fa-user text-white text-2xl"></i>' +
+                            '</div>' +
+                            '<div class="text-white">' +
+                                '<h3 class="text-xl font-bold">' + assignee + '</h3>' +
+                                '<p class="text-white/80 text-sm">総工数: ' + info.totalDays + '日</p>' +
+                            '</div>' +
+                        '</div>' +
+                    '</div>' +
+
+                    // 進捗バー
+                    '<div class="px-4 py-3 border-b border-slate-100">' +
+                        '<div class="flex justify-between text-xs text-slate-500 mb-1">' +
+                            '<span>進捗状況</span>' +
+                            '<span>完了: ' + info.completedDays + '日 / 進行中: ' + info.inProgressDays + '日 / 未着手: ' + info.pendingDays + '日</span>' +
+                        '</div>' +
+                        '<div class="h-3 bg-slate-200 rounded-full overflow-hidden flex">' +
+                            '<div class="bg-emerald-500 progress-bar" style="width: ' + completedPercent + '%"></div>' +
+                            '<div class="bg-blue-500 progress-bar" style="width: ' + inProgressPercent + '%"></div>' +
+                        '</div>' +
+                    '</div>' +
+
+                    // 顧客別内訳
+                    '<div class="p-4">' +
+                        '<h4 class="text-sm font-semibold text-slate-700 mb-3">顧客別内訳</h4>' +
+                        '<div class="space-y-2">';
+
+                Object.keys(info.customers).forEach(function(customer) {
+                    var days = info.customers[customer];
+                    var percent = Math.round((days / info.totalDays) * 100);
+                    cardHtml += '<div class="flex items-center justify-between">' +
+                        '<span class="text-sm text-slate-600 truncate flex-1">' + customer + '</span>' +
+                        '<span class="text-sm font-medium text-slate-800 ml-2">' + days + '日 (' + percent + '%)</span>' +
+                    '</div>';
+                });
+
+                cardHtml += '</div></div>' +
+
+                    // プロジェクト別タスク
+                    '<div class="px-4 pb-4">' +
+                        '<h4 class="text-sm font-semibold text-slate-700 mb-3">プロジェクト別タスク</h4>' +
+                        '<div class="space-y-3">';
+
+                Object.keys(info.projects).forEach(function(projectId) {
+                    var proj = info.projects[projectId];
+                    cardHtml += '<div class="bg-slate-50 rounded-lg p-3">' +
+                        '<div class="flex items-center mb-2">' +
+                            '<div class="w-3 h-3 rounded mr-2" style="background: ' + proj.color + '"></div>' +
+                            '<span class="text-sm font-medium text-slate-800">' + proj.name + '</span>' +
+                            '<span class="ml-auto text-xs text-slate-500">' + proj.days + '日</span>' +
+                        '</div>' +
+                        '<div class="text-xs text-slate-500 mb-2">' + proj.customer + '</div>' +
+                        '<div class="space-y-1">';
+
+                    proj.tasks.forEach(function(task) {
+                        var statusClass = task.progress === 100 ? 'text-emerald-600' :
+                                         (task.progress > 0 ? 'text-blue-600' : 'text-slate-400');
+                        var statusIcon = task.progress === 100 ? 'fa-check-circle' :
+                                        (task.progress > 0 ? 'fa-spinner' : 'fa-circle');
+                        cardHtml += '<div class="flex items-center text-xs">' +
+                            '<i class="fas ' + statusIcon + ' ' + statusClass + ' mr-2"></i>' +
+                            '<span class="text-slate-600 flex-1">' + task.name + '</span>' +
+                            '<span class="text-slate-500">' + task.manDays + '日</span>' +
+                            '<span class="ml-2 ' + statusClass + ' font-medium">' + task.progress + '%</span>' +
+                        '</div>';
+                    });
+
+                    cardHtml += '</div></div>';
+                });
+
+                cardHtml += '</div></div></div>';
+
+                $container.append(cardHtml);
+            });
+        }
+
+        // 初期化
+        $(document).ready(function() {
+            generateAssigneeCards();
+        });
+    </script>
+</body>
+</html>

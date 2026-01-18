@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レポート詳細 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* ユーザーメニュー */
+        .user-menu-container {
+            position: relative;
+        }
+        .user-menu-trigger {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-menu-trigger:hover {
+            background: #f8fafc;
+        }
+        .user-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            z-index: 9999;
+            min-width: 240px;
+            padding: 0;
+            display: none;
+            overflow: hidden;
+        }
+        .user-menu-dropdown.show {
+            display: block;
+            animation: fadeInDown 0.2s ease;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-menu-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .user-menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #475569;
+            font-size: 14px;
+        }
+        .user-menu-item:hover {
+            background: #f8fafc;
+        }
+        .user-menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            color: #94a3b8;
+        }
+        .user-menu-item.logout {
+            color: #dc2626;
+            border-top: 1px solid #e2e8f0;
+        }
+        .user-menu-item.logout i {
+            color: #dc2626;
+        }
+        .user-menu-item.logout:hover {
+            background: #fef2f2;
+        }
+
+        /* ステータスバッジ */
+        .status-draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-submitted {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* Markdown プレビュー */
+        .markdown-preview h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; color: #1e293b; }
+        .markdown-preview h2 { font-size: 1.25rem; font-weight: 600; margin: 1.5rem 0 0.75rem; color: #334155; border-bottom: 2px solid #e2e8f0; padding-bottom: 0.5rem; }
+        .markdown-preview h3 { font-size: 1.1rem; font-weight: 600; margin: 1rem 0 0.5rem; color: #475569; }
+        .markdown-preview p { margin: 0.75rem 0; line-height: 1.7; color: #475569; }
+        .markdown-preview ul { list-style: disc; margin-left: 1.5rem; margin-top: 0.5rem; margin-bottom: 0.5rem; }
+        .markdown-preview ol { list-style: decimal; margin-left: 1.5rem; }
+        .markdown-preview li { margin: 0.375rem 0; color: #475569; line-height: 1.6; }
+        .markdown-preview code { background: #f1f5f9; padding: 0.125rem 0.375rem; border-radius: 4px; font-size: 0.875rem; color: #dc2626; }
+        .markdown-preview pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; margin: 1rem 0; }
+        .markdown-preview pre code { background: transparent; padding: 0; color: #e2e8f0; }
+        .markdown-preview blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 1rem 0; color: #64748b; background: #f8fafc; padding: 1rem; border-radius: 0 8px 8px 0; }
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #e2e8f0; padding: 0.75rem; text-align: left; }
+        .markdown-preview th { background: #f8fafc; font-weight: 600; color: #334155; }
+        .markdown-preview td { color: #475569; }
+        .markdown-preview strong { color: #1e293b; font-weight: 600; }
+
+        /* 最大化モード */
+        .fullscreen-mode {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            background: white !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <!-- サイドバーモーダル -->
+    <div id="sidebar-modal-overlay" class="sidebar-modal-overlay"></div>
+    <aside id="sidebar-modal" class="sidebar-modal text-white">
+        <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <a href="../dashboard.html" class="flex items-center">
+                <i class="fas fa-project-diagram text-blue-400 mr-3 text-lg"></i>
+                <span class="text-lg font-bold text-white">PM System</span>
+            </a>
+            <button id="sidebar-modal-close" class="p-1.5 hover:bg-slate-700 rounded text-slate-400">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="mt-4">
+            <a href="../dashboard.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-tachometer-alt w-5 mr-3 text-slate-400"></i><span>ダッシュボード</span>
+            </a>
+            <a href="../customers/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-building w-5 mr-3 text-slate-400"></i><span>顧客</span>
+            </a>
+            <a href="../projects/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-folder w-5 mr-3 text-slate-400"></i><span>プロジェクト</span>
+            </a>
+            <a href="../schedule/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-calendar-alt w-5 mr-3 text-slate-400"></i><span>スケジュール</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-users w-5 mr-3 text-slate-400"></i><span>メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-yen-sign w-5 mr-3 text-slate-400"></i><span>原価管理</span>
+            </a>
+            <a href="index.html" class="nav-item active flex items-center text-white">
+                <i class="fas fa-chart-bar w-5 mr-3 text-blue-400"></i><span>レポート</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-8 py-3">
+                    <div class="flex items-center space-x-3">
+                        <button id="sidebar-toggle" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                            <i class="fas fa-bars text-slate-600"></i>
+                        </button>
+                        <a href="../dashboard.html" class="flex items-center">
+                            <i class="fas fa-project-diagram text-blue-500 text-xl mr-2"></i>
+                            <span class="text-lg font-bold text-slate-800">PM System</span>
+                        </a>
+                        <div class="h-6 w-px bg-slate-300 mx-2"></div>
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-md">
+                            <i class="fas fa-file-alt text-white text-xs"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">レポート詳細</h2>
+                            <p class="text-xs text-slate-500">2024/04/04（木）〜 2024/04/10（水）</p>
+                        </div>
+                        <span id="status-badge" class="px-3 py-1 rounded-full text-xs font-medium status-draft ml-2">下書き</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700" id="today-date">2024年4月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                                            山
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-user"></i>
+                                    <span>プロフィール</span>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-cog"></i>
+                                    <span>設定</span>
+                                </div>
+                                <div class="user-menu-item logout" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>ログアウト</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- アクションバー -->
+            <div class="bg-white border-b border-slate-200 px-6 py-3">
+                <div class="flex items-center justify-between max-w-5xl mx-auto">
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 text-sm text-slate-600">
+                            <i class="fas fa-globe text-emerald-500"></i>
+                            <span class="font-medium">全顧客・全プロジェクト対象</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <a id="edit-button" href="edit.html" class="inline-flex items-center px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-100 transition-colors">
+                            <i class="fas fa-edit mr-1.5"></i>編集
+                        </a>
+                        <button onclick="exportPDF()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors">
+                            <i class="fas fa-file-pdf mr-1.5"></i>PDF出力
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- メインエリア -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <div class="max-w-5xl mx-auto">
+                    <!-- レポート情報 -->
+                    <div class="bg-white rounded-xl card-shadow border border-slate-100 p-6 mb-6">
+                        <div class="grid grid-cols-4 gap-6">
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium mb-1">作成者</p>
+                                <div class="flex items-center space-x-2">
+                                    <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white text-xs font-bold">山</div>
+                                    <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium mb-1">作成日</p>
+                                <p class="text-sm font-medium text-slate-700">2024/04/10</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium mb-1">更新日</p>
+                                <p class="text-sm font-medium text-slate-700">2024/04/10 15:30</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium mb-1">ステータス</p>
+                                <span class="px-2 py-0.5 rounded-full text-xs font-medium status-draft">下書き</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- レポート本文 -->
+                    <div id="report-content" class="bg-white rounded-xl card-shadow border border-slate-100 overflow-hidden">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+                            <h3 class="text-sm font-semibold text-slate-700 flex items-center">
+                                <i class="fas fa-file-alt text-emerald-500 mr-2"></i>レポート本文
+                            </h3>
+                            <button onclick="toggleFullscreen()" class="p-1.5 hover:bg-slate-200 rounded-lg transition-colors" title="最大化">
+                                <i id="fullscreen-icon" class="fas fa-expand text-slate-500 text-sm"></i>
+                            </button>
+                        </div>
+                        <div class="p-6">
+                            <div id="markdown-preview" class="markdown-preview">
+                                <h2>今週の全体進捗サマリー</h2>
+                                <ul>
+                                    <li>全7プロジェクト中、<strong>5プロジェクト</strong>が進行中</li>
+                                    <li>今週完了したタスク: <strong>3件</strong></li>
+                                    <li>遅延中のタスク: <strong>1件</strong>（勤怠管理システム - 要件定義）</li>
+                                </ul>
+
+                                <h2>株式会社ABC商事</h2>
+                                <h3>ECサイトリニューアル（進捗: 35%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>要件定義</td>
+                                            <td>山田太郎</td>
+                                            <td>100%</td>
+                                            <td>完了</td>
+                                        </tr>
+                                        <tr>
+                                            <td>基本設計</td>
+                                            <td>佐藤花子</td>
+                                            <td>60%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>詳細設計</td>
+                                            <td>鈴木一郎</td>
+                                            <td>0%</td>
+                                            <td>未着手</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h3>基幹システム更新（進捗: 20%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>現行システム分析</td>
+                                            <td>高橋健太</td>
+                                            <td>80%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>移行計画策定</td>
+                                            <td>伊藤誠</td>
+                                            <td>0%</td>
+                                            <td>未着手</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h2>XYZ株式会社</h2>
+                                <h3>社内業務システム開発（進捗: 45%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>DB設計</td>
+                                            <td>中村隆</td>
+                                            <td>100%</td>
+                                            <td>完了</td>
+                                        </tr>
+                                        <tr>
+                                            <td>API開発</td>
+                                            <td>小林由美</td>
+                                            <td>40%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h3>勤怠管理システム（進捗: 10%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                            <th>備考</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>要件定義</td>
+                                            <td>山田太郎</td>
+                                            <td>50%</td>
+                                            <td>遅延</td>
+                                            <td>顧客要件追加により2日遅延</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h2>株式会社テックソリューション</h2>
+                                <h3>モバイルアプリ開発（進捗: 60%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>UI実装</td>
+                                            <td>田中美咲</td>
+                                            <td>80%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>API連携</td>
+                                            <td>渡辺剛</td>
+                                            <td>40%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h2>グローバルトレード株式会社</h2>
+                                <h3>在庫管理システム（進捗: 85%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>結合テスト</td>
+                                            <td>佐藤花子</td>
+                                            <td>70%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                        <tr>
+                                            <td>マニュアル作成</td>
+                                            <td>松本真一</td>
+                                            <td>100%</td>
+                                            <td>完了</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h3>受発注システム改修（進捗: 30%）</h3>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>タスク</th>
+                                            <th>担当</th>
+                                            <th>進捗</th>
+                                            <th>状態</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>改修要件整理</td>
+                                            <td>鈴木一郎</td>
+                                            <td>100%</td>
+                                            <td>完了</td>
+                                        </tr>
+                                        <tr>
+                                            <td>コード修正</td>
+                                            <td>高橋健太</td>
+                                            <td>20%</td>
+                                            <td>進行中</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+
+                                <h2>課題・リスク</h2>
+                                <ul>
+                                    <li><strong>勤怠管理システム</strong>: 顧客からの追加要件により要件定義が2日遅延。来週中に完了予定</li>
+                                    <li><strong>モバイルアプリ開発</strong>: iOS審査対応のためスケジュール調整が必要な可能性あり</li>
+                                </ul>
+
+                                <h2>来週の予定</h2>
+                                <ul>
+                                    <li><strong>ECサイトリニューアル</strong>: 基本設計の完了、詳細設計の着手</li>
+                                    <li><strong>勤怠管理システム</strong>: 要件定義の完了</li>
+                                    <li><strong>在庫管理システム</strong>: 結合テスト完了、ユーザー受入テスト開始</li>
+                                    <li><strong>受発注システム改修</strong>: コード修正の継続</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // サイドバーモーダル
+        const sidebarModal = document.getElementById('sidebar-modal');
+        const sidebarModalOverlay = document.getElementById('sidebar-modal-overlay');
+        const sidebarToggle = document.getElementById('sidebar-toggle');
+        const sidebarModalClose = document.getElementById('sidebar-modal-close');
+
+        function openSidebar() {
+            sidebarModal.classList.add('show');
+            sidebarModalOverlay.classList.add('show');
+        }
+        function closeSidebar() {
+            sidebarModal.classList.remove('show');
+            sidebarModalOverlay.classList.remove('show');
+        }
+        sidebarToggle.addEventListener('click', openSidebar);
+        sidebarModalClose.addEventListener('click', closeSidebar);
+        sidebarModalOverlay.addEventListener('click', closeSidebar);
+
+        // ユーザーメニュー
+        const userMenuTrigger = document.getElementById('user-menu-trigger');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        const userMenuArrow = document.getElementById('user-menu-arrow');
+
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenuDropdown.classList.toggle('show');
+            userMenuArrow.style.transform = userMenuDropdown.classList.contains('show') ? 'rotate(180deg)' : '';
+        });
+
+        document.addEventListener('click', () => {
+            userMenuDropdown.classList.remove('show');
+            userMenuArrow.style.transform = '';
+        });
+
+        // 今日の日付を設定
+        function setTodayDate() {
+            const today = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('today-date').textContent = today.toLocaleDateString('ja-JP', options);
+        }
+        setTodayDate();
+
+        // URLパラメータからステータスを取得
+        function getStatusFromURL() {
+            const params = new URLSearchParams(window.location.search);
+            return params.get('status') || 'draft';
+        }
+
+        // ステータスに応じて表示を更新
+        function updateStatusDisplay() {
+            const status = getStatusFromURL();
+            const badges = document.querySelectorAll('.status-draft, .status-submitted, .status-approved');
+            const editButton = document.getElementById('edit-button');
+
+            badges.forEach(badge => {
+                badge.className = 'px-3 py-1 rounded-full text-xs font-medium';
+                if (status === 'draft') {
+                    badge.classList.add('status-draft');
+                    badge.textContent = '下書き';
+                } else if (status === 'submitted') {
+                    badge.classList.add('status-submitted');
+                    badge.textContent = '提出済み';
+                } else {
+                    badge.classList.add('status-approved');
+                    badge.textContent = '承認済み';
+                }
+            });
+
+            // 承認済みの場合は編集ボタンを非表示
+            if (status === 'approved') {
+                editButton.style.display = 'none';
+            } else {
+                editButton.style.display = 'inline-flex';
+            }
+        }
+        updateStatusDisplay();
+
+        // 最大化モード
+        let isFullscreen = false;
+
+        function toggleFullscreen() {
+            const content = document.getElementById('report-content');
+            const icon = document.getElementById('fullscreen-icon');
+
+            if (isFullscreen) {
+                content.classList.remove('fullscreen-mode');
+                icon.classList.remove('fa-compress');
+                icon.classList.add('fa-expand');
+                document.body.style.overflow = '';
+            } else {
+                content.classList.add('fullscreen-mode');
+                icon.classList.remove('fa-expand');
+                icon.classList.add('fa-compress');
+                document.body.style.overflow = 'hidden';
+            }
+            isFullscreen = !isFullscreen;
+        }
+
+        // PDF出力
+        function exportPDF() {
+            alert('PDF出力機能は実装予定です');
+        }
+
+        // ログアウト
+        function logout() {
+            if (confirm('ログアウトしてよろしいですか？')) {
+                location.href = '../login.html';
+            }
+        }
+
+        // ESCキーで最大化モードを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isFullscreen) {
+                toggleFullscreen();
+            }
+        });
+    </script>
+</body>
+</html>

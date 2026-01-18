@@ -1,0 +1,3248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>タスク一覧 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        /* チェックボックスを大きく */
+        .row-checkbox, #select-all {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in { animation: fadeIn 0.3s ease-out; }
+
+        /* ユーザーメニュー */
+        .user-menu-container { position: relative; }
+        .user-menu-trigger { cursor: pointer; transition: all 0.2s; }
+        .user-menu-trigger:hover { background: #f8fafc; }
+        .user-menu-dropdown {
+            position: absolute; top: 100%; right: 0; margin-top: 8px;
+            background: white; border: 1px solid #e2e8f0; border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15); z-index: 9999; min-width: 240px;
+            display: none; overflow: hidden;
+        }
+        .user-menu-dropdown.show { display: block; animation: fadeInDown 0.2s ease; }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-8px); } to { opacity: 1; transform: translateY(0); } }
+        .user-menu-header { padding: 16px; background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); border-bottom: 1px solid #e2e8f0; }
+        .user-menu-item { padding: 12px 16px; display: flex; align-items: center; cursor: pointer; transition: all 0.2s; color: #475569; font-size: 14px; }
+        .user-menu-item:hover { background: #f8fafc; }
+        .user-menu-item i { width: 20px; margin-right: 12px; color: #94a3b8; }
+        .user-menu-item.logout { color: #dc2626; border-top: 1px solid #e2e8f0; }
+        .user-menu-item.logout i { color: #dc2626; }
+        .user-menu-item.logout:hover { background: #fef2f2; }
+
+        /* 編集可能セル */
+        .editable-cell { transition: all 0.2s; }
+        .editable-cell:hover { background: #f0f9ff; }
+        .edit-mode .editable-cell { background: #fffbeb; cursor: text; }
+        .edit-mode .editable-cell:focus-within { background: #fef3c7; box-shadow: inset 0 0 0 2px #f59e0b; }
+        .edit-input { width: 100%; height: 100%; border: none; background: transparent; padding: 0; font-size: inherit; color: inherit; }
+        .edit-input:focus { outline: none; }
+
+        /* 行選択 */
+        .task-row.selected { background: #eff6ff !important; }
+        .task-row:hover { background: #f8fafc; }
+
+        /* ステータスバッジ */
+        .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
+        .status-not-started { background: #f1f5f9; color: #64748b; }
+        .status-in-progress { background: #dbeafe; color: #2563eb; }
+        .status-completed { background: #dcfce7; color: #16a34a; }
+        .status-delayed { background: #fee2e2; color: #dc2626; }
+
+        /* ペースト領域 */
+        .paste-area { border: 2px dashed #cbd5e1; border-radius: 8px; transition: all 0.2s; }
+        .paste-area:hover { border-color: #3b82f6; background: #eff6ff; }
+        .paste-area.dragover { border-color: #3b82f6; background: #dbeafe; }
+
+        /* テーブルスクロール */
+        .table-container { scrollbar-width: thin; scrollbar-color: rgba(156, 163, 175, 0.5) transparent; }
+        .table-container::-webkit-scrollbar { width: 8px; height: 8px; }
+        .table-container::-webkit-scrollbar-track { background: #f1f5f9; }
+        .table-container::-webkit-scrollbar-thumb { background-color: rgba(156, 163, 175, 0.6); border-radius: 4px; }
+
+        /* 右クリックメニュー */
+        .context-menu { position: fixed; background: white; border: 1px solid #e2e8f0; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.15); z-index: 1000; min-width: 180px; padding: 4px 0; display: none; }
+        .context-menu.show { display: block; }
+        .context-menu-item { padding: 8px 16px; cursor: pointer; display: flex; align-items: center; font-size: 14px; color: #475569; }
+        .context-menu-item:hover { background: #f1f5f9; }
+        .context-menu-item i { width: 20px; margin-right: 8px; color: #94a3b8; }
+        .context-menu-separator { height: 1px; background: #e2e8f0; margin: 4px 0; }
+
+        /* 実績ヘッダー背景 */
+        .actual-header { background: #fef3c7; }
+
+        /* ドラッグハンドル */
+        .drag-handle { cursor: grab; color: #94a3b8; padding: 4px; }
+        .drag-handle:hover { color: #3b82f6; }
+        .drag-handle:active { cursor: grabbing; }
+        .task-row.dragging { opacity: 0.5; background: #dbeafe; }
+        .task-row.drag-over { border-top: 2px solid #3b82f6; }
+        .task-row.copied { background: #ecfdf5 !important; }
+        .task-row.date-edited, .subtask-row.date-edited { background: #fef9c3 !important; }
+        .task-row.date-edited td, .subtask-row.date-edited td { background: #fef9c3 !important; }
+        .task-row.date-edited:hover, .subtask-row.date-edited:hover { background: #fef08a !important; }
+        .task-row.date-edited:hover td, .subtask-row.date-edited:hover td { background: #fef08a !important; }
+        /* 終了タスク選択モーダル */
+        .end-task-select-row { cursor: pointer; transition: all 0.15s; }
+        .end-task-select-row:hover { background: #dbeafe !important; }
+        .task-row.completed-row { background: #f0fdf4 !important; }
+        .task-row.completed-row:hover { background: #dcfce7 !important; }
+
+        /* 予定ヘッダー背景 */
+        .planned-header { background: #e0f2fe; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <!-- サイドバーモーダルオーバーレイ -->
+    <div id="sidebar-modal-overlay" class="sidebar-modal-overlay" onclick="closeSidebarModal()"></div>
+
+    <!-- サイドバーモーダル -->
+    <div id="sidebar-modal" class="sidebar-modal">
+        <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <a href="../dashboard.html" class="flex items-center">
+                <i class="fas fa-project-diagram text-blue-400 mr-3 text-lg"></i>
+                <span class="text-lg font-bold text-white">PM System</span>
+            </a>
+            <button onclick="closeSidebarModal()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400">
+                <i class="fas fa-times text-sm"></i>
+            </button>
+        </div>
+        <nav class="mt-4 px-1">
+            <a href="../dashboard.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="ダッシュボード">
+                <i class="fas fa-tachometer-alt w-5 mr-3 text-slate-400"></i><span class="nav-text">ダッシュボード</span>
+            </a>
+            <a href="../projects/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="プロジェクト">
+                <i class="fas fa-folder w-5 mr-3 text-slate-400"></i><span class="nav-text">プロジェクト</span>
+            </a>
+            <a href="../schedule/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="スケジュール">
+                <i class="fas fa-calendar-alt w-5 mr-3 text-slate-400"></i><span class="nav-text">スケジュール</span>
+            </a>
+            <a href="index.html" class="nav-item active flex items-center px-4 py-3 text-white" title="タスク一覧">
+                <i class="fas fa-tasks w-5 mr-3 text-blue-400"></i><span class="nav-text">タスク一覧</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="メンバー">
+                <i class="fas fa-users w-5 mr-3 text-slate-400"></i><span class="nav-text">メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="原価管理">
+                <i class="fas fa-yen-sign w-5 mr-3 text-slate-400"></i><span class="nav-text">原価管理</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white" title="レポート">
+                <i class="fas fa-chart-bar w-5 mr-3 text-slate-400"></i><span class="nav-text">レポート</span>
+            </a>
+        </nav>
+    </div>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-8 py-3">
+                    <div class="flex items-center space-x-4">
+                        <!-- ハンバーガーメニュー -->
+                        <button id="sidebar-toggle" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600" onclick="openSidebarModal()">
+                            <i class="fas fa-bars text-lg"></i>
+                        </button>
+                        <!-- PM System ロゴ -->
+                        <a href="../dashboard.html" class="flex items-center space-x-2">
+                            <i class="fas fa-project-diagram text-blue-500 text-lg"></i>
+                            <span class="text-lg font-bold text-slate-800">PM System</span>
+                        </a>
+                        <div class="border-l border-slate-300 h-6"></div>
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-md">
+                            <i class="fas fa-tasks text-white text-xs"></i>
+                        </div>
+                        <h2 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">タスク一覧</h2>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700">2024年4月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">山</div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 pt-3 border-t border-slate-200">
+                                        <div class="flex items-center text-xs text-slate-500">
+                                            <i class="fas fa-clock mr-2 text-slate-400"></i>
+                                            <span>最終ログイン: 2024年4月9日 18:32</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'"><i class="fas fa-user"></i><span>プロフィール</span></div>
+                                <div class="user-menu-item" onclick="location.href='#'"><i class="fas fa-cog"></i><span>設定</span></div>
+                                <div class="user-menu-item logout" onclick="logout()"><i class="fas fa-sign-out-alt"></i><span>ログアウト</span></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- サブヘッダー -->
+            <div class="bg-white border-b border-slate-200 px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <!-- プロジェクト選択 -->
+                        <select id="project-select" class="border border-slate-300 rounded-lg px-3 py-2 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" style="min-width: 280px;" onchange="onProjectChange(this.value)">
+                            <option value="all">全プロジェクト（横断表示）</option>
+                            <optgroup label="株式会社ABC商事">
+                                <option value="1" selected>ECサイトリニューアル</option>
+                                <option value="2">基幹システム更新</option>
+                            </optgroup>
+                            <optgroup label="XYZ株式会社">
+                                <option value="3">社内業務システム開発</option>
+                            </optgroup>
+                        </select>
+
+                        <!-- 表示切り替え -->
+                        <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                            <a href="../schedule/index.html" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border-r border-slate-300">
+                                <i class="fas fa-chart-gantt mr-2"></i>ガントチャート
+                            </a>
+                            <span class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600">
+                                <i class="fas fa-list mr-2"></i>一覧
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <!-- 検索 -->
+                        <div class="relative">
+                            <input type="text" placeholder="タスクを検索..." class="pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm w-48 focus:ring-2 focus:ring-blue-500 focus:border-blue-500" oninput="searchTasks(this.value)">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm"></i>
+                        </div>
+                        <!-- フィルター -->
+                        <button onclick="toggleFilterPanel()" id="filter-btn" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm bg-white">
+                            <i class="fas fa-filter mr-2"></i>絞り込み
+                        </button>
+                        <!-- インポート -->
+                        <button onclick="openImportModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm bg-white">
+                            <i class="fas fa-file-import mr-2"></i>インポート
+                        </button>
+                        <!-- エクスポート -->
+                        <button onclick="openExportModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm bg-white">
+                            <i class="fas fa-file-export mr-2"></i>エクスポート
+                        </button>
+                        <!-- 一括日付更新（日付編集時に表示） -->
+                        <button id="bulk-date-btn" onclick="openBulkDateModal()" class="hidden px-4 py-2 border border-amber-400 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 shadow-sm bg-amber-50">
+                            <i class="fas fa-calendar-alt mr-2"></i>一括日付更新
+                        </button>
+                        <!-- 編集モード切り替え（右端に配置） -->
+                        <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
+                            <button id="btn-view-mode" class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600" onclick="switchViewMode('view')">
+                                <i class="fas fa-eye mr-1"></i>表示
+                            </button>
+                            <button id="btn-edit-mode" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50" onclick="switchViewMode('edit')">
+                                <i class="fas fa-edit mr-1"></i>編集
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 絞り込みパネル -->
+            <div id="filter-panel" class="bg-slate-50 border-b border-slate-200 px-6 py-3 hidden">
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600 font-medium">工程:</label>
+                        <select id="filter-process" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                            <option value="">すべて</option>
+                            <option value="要件定義">要件定義</option>
+                            <option value="設計">設計</option>
+                            <option value="開発">開発</option>
+                            <option value="テスト">テスト</option>
+                            <option value="リリース">リリース</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600 font-medium">担当者:</label>
+                        <select id="filter-assignee" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                            <option value="">すべて</option>
+                            <option value="山田">山田</option>
+                            <option value="佐藤">佐藤</option>
+                            <option value="鈴木">鈴木</option>
+                            <option value="田中">田中</option>
+                            <option value="高橋">高橋</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600 font-medium">ステータス:</label>
+                        <select id="filter-status" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                            <option value="">すべて</option>
+                            <option value="未着手">未着手</option>
+                            <option value="進行中">進行中</option>
+                            <option value="完了">完了</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600 font-medium">進捗:</label>
+                        <select id="filter-progress" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                            <option value="">すべて</option>
+                            <option value="0">0%</option>
+                            <option value="1-99">1-99%</option>
+                            <option value="100">100%</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600 font-medium">遅延:</label>
+                        <select id="filter-delay" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                            <option value="">すべて</option>
+                            <option value="delayed">遅延あり</option>
+                            <option value="ontime">予定通り</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <span class="text-xs text-sky-700 font-medium bg-sky-100 px-2 py-0.5 rounded">予定</span>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">営業工数:</label>
+                        <input type="number" id="filter-sales-min" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="min" min="0" step="0.5">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="number" id="filter-sales-max" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="max" min="0" step="0.5">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">工数:</label>
+                        <input type="number" id="filter-mandays-min" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="min" min="0" step="0.5">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="number" id="filter-mandays-max" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="max" min="0" step="0.5">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">開始日:</label>
+                        <input type="date" id="filter-start-from" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="date" id="filter-start-to" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">終了日:</label>
+                        <input type="date" id="filter-end-from" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="date" id="filter-end-to" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">原価:</label>
+                        <input type="number" id="filter-cost-min" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-20" placeholder="min" min="0">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="number" id="filter-cost-max" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-20" placeholder="max" min="0">
+                    </div>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 mb-2">
+                    <span class="text-xs text-amber-700 font-medium bg-amber-100 px-2 py-0.5 rounded">実績</span>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">実工数:</label>
+                        <input type="number" id="filter-actual-mandays-min" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="min" min="0" step="0.5">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="number" id="filter-actual-mandays-max" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-14" placeholder="max" min="0" step="0.5">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">実開始:</label>
+                        <input type="date" id="filter-actual-start-from" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="date" id="filter-actual-start-to" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">実終了:</label>
+                        <input type="date" id="filter-actual-end-from" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="date" id="filter-actual-end-to" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white">
+                    </div>
+                    <div class="flex items-center space-x-1">
+                        <label class="text-xs text-slate-600">出来高:</label>
+                        <input type="number" id="filter-actual-cost-min" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-20" placeholder="min" min="0">
+                        <span class="text-xs text-slate-400">〜</span>
+                        <input type="number" id="filter-actual-cost-max" class="border border-slate-300 rounded px-2 py-1 text-xs bg-white w-20" placeholder="max" min="0">
+                    </div>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button onclick="applyFilter()" class="px-4 py-1.5 bg-blue-600 text-white rounded text-sm font-medium hover:bg-blue-700">検索</button>
+                    <button onclick="clearFilter()" class="px-4 py-1.5 border border-slate-300 rounded text-sm font-medium text-slate-600 hover:bg-slate-50">クリア</button>
+                </div>
+            </div>
+
+            <!-- 選択時アクションバー -->
+            <div id="selection-action-bar" class="bg-blue-50 border-b border-blue-200 px-6 py-2 hidden">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-blue-700"><strong id="selected-count">0</strong>件選択中</span>
+                        <button onclick="openBulkEditModal()" class="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                            <i class="fas fa-edit mr-1"></i>一括編集
+                        </button>
+                        <button onclick="bulkDelete()" class="px-3 py-1.5 border border-rose-300 text-rose-600 rounded-lg text-sm font-medium hover:bg-rose-50">
+                            <i class="fas fa-trash mr-1"></i>一括削除
+                        </button>
+                    </div>
+                    <button onclick="clearSelection()" class="text-sm text-slate-500 hover:text-slate-700">
+                        <i class="fas fa-times mr-1"></i>選択解除
+                    </button>
+                </div>
+            </div>
+
+            <!-- クリップボードステータス -->
+            <div id="clipboard-status" class="fixed top-20 left-1/2 transform -translate-x-1/2 z-50 hidden">
+                <span class="text-sm text-emerald-700 bg-emerald-100 px-4 py-2 rounded-full shadow-lg">
+                    <i class="fas fa-clipboard-check mr-1"></i>行をコピーしました（Ctrl+Vで貼り付け）
+                </span>
+            </div>
+
+            <!-- タスク一覧テーブル -->
+            <main class="flex-1 overflow-hidden bg-white">
+                <div class="h-full overflow-auto table-container" id="table-container">
+                    <table class="w-full border-collapse min-w-max" id="task-table">
+                        <thead class="sticky top-0 z-10">
+                            <tr class="bg-slate-100 border-b-2 border-slate-300">
+                                <th class="w-10 px-2 py-3 text-center border-r border-slate-200" rowspan="2">
+                                    <input type="checkbox" id="select-all" class="rounded border-slate-300">
+                                </th>
+                                <th class="w-10 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2" title="ドラッグで並替">並替</th>
+                                <th class="w-12 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2">No</th>
+                                <th class="w-20 px-2 py-3 text-xs font-bold text-slate-600 text-left border-r border-slate-200" rowspan="2">工程</th>
+                                <th class="min-w-40 px-2 py-3 text-xs font-bold text-slate-600 text-left border-r border-slate-200" rowspan="2">タスク名</th>
+                                <th class="w-16 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2">担当者</th>
+                                <th class="w-20 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2">ステータス</th>
+                                <!-- 予定 -->
+                                <th class="px-2 py-1 text-xs font-bold text-sky-800 text-center border-r border-slate-200 planned-header" colspan="5">予定</th>
+                                <!-- 実績 -->
+                                <th class="px-2 py-1 text-xs font-bold text-amber-800 text-center border-r border-slate-200 actual-header" colspan="4">実績</th>
+                                <th class="w-14 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2">進捗</th>
+                                <th class="w-16 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200" rowspan="2">遅延</th>
+                                <th class="min-w-24 px-2 py-3 text-xs font-bold text-slate-600 text-left" rowspan="2">備考</th>
+                            </tr>
+                            <tr class="bg-slate-50 border-b border-slate-300">
+                                <!-- 予定サブヘッダー -->
+                                <th class="w-14 px-1 py-2 text-xs font-semibold text-sky-700 text-center border-r border-slate-200 planned-header">営業工数</th>
+                                <th class="w-14 px-1 py-2 text-xs font-semibold text-sky-700 text-center border-r border-slate-200 planned-header">工数</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-sky-700 text-center border-r border-slate-200 planned-header">開始日</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-sky-700 text-center border-r border-slate-200 planned-header">終了日</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-sky-700 text-center border-r border-slate-200 planned-header">原価</th>
+                                <!-- 実績サブヘッダー -->
+                                <th class="w-14 px-1 py-2 text-xs font-semibold text-amber-700 text-center border-r border-slate-200 actual-header">実工数</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-amber-700 text-center border-r border-slate-200 actual-header">実開始</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-amber-700 text-center border-r border-slate-200 actual-header">実終了</th>
+                                <th class="w-20 px-1 py-2 text-xs font-semibold text-amber-700 text-center border-r border-slate-200 actual-header">出来高</th>
+                            </tr>
+                        </thead>
+                        <tbody id="task-tbody">
+                            <!-- JavaScriptで生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </main>
+
+            <!-- フッター -->
+            <footer class="bg-white border-t border-slate-200 px-6 py-3 flex-shrink-0">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4 text-xs text-slate-500">
+                        <span><i class="fas fa-tasks mr-1"></i>全タスク: <strong class="text-slate-700" id="total-count">15件</strong></span>
+                        <span><i class="fas fa-check-circle mr-1 text-emerald-500"></i>完了: <strong class="text-emerald-600" id="completed-count">7件</strong></span>
+                        <span><i class="fas fa-spinner mr-1 text-blue-500"></i>進行中: <strong class="text-blue-600" id="progress-count">3件</strong></span>
+                        <span><i class="fas fa-clock mr-1 text-slate-400"></i>未着手: <strong class="text-slate-600" id="notstarted-count">5件</strong></span>
+                        <span class="border-l border-slate-300 pl-4"><i class="fas fa-exclamation-triangle mr-1 text-rose-500"></i>遅延: <strong class="text-rose-600" id="delayed-count">3件</strong></span>
+                    </div>
+                    <div id="edit-actions" class="flex items-center space-x-3 hidden">
+                        <span class="text-sm text-amber-600"><i class="fas fa-info-circle mr-1"></i>編集モード中</span>
+                        <button onclick="undoChanges()" id="undo-btn" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed" disabled title="元に戻す (Ctrl+Z)">
+                            <i class="fas fa-undo mr-2"></i>元に戻す
+                        </button>
+                        <button onclick="cancelEdit()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 bg-white">
+                            キャンセル
+                        </button>
+                        <button onclick="saveAllTasks()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-lg">
+                            <i class="fas fa-save mr-2"></i>一括登録
+                        </button>
+                    </div>
+                    <div id="view-actions" class="flex items-center space-x-3">
+                        <span class="text-slate-400">© 2024 PM System</span>
+                    </div>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <!-- 右クリックメニュー（タスク用） -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item" onclick="addRowAbove()"><i class="fas fa-arrow-up"></i>上に行追加</div>
+        <div class="context-menu-item" onclick="addRowBelow()"><i class="fas fa-arrow-down"></i>下に行追加</div>
+        <div class="context-menu-item" onclick="addSubtaskFromMenu()"><i class="fas fa-level-up-alt fa-rotate-90"></i>サブタスク追加</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="copyTaskAbove()"><i class="fas fa-level-up-alt"></i>コピーして上に追加</div>
+        <div class="context-menu-item" onclick="copyTaskBelow()"><i class="fas fa-level-down-alt"></i>コピーして下に追加</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="deleteTask()" style="color: #dc2626;"><i class="fas fa-trash" style="color: #dc2626;"></i>削除</div>
+    </div>
+
+    <!-- 右クリックメニュー（サブタスク用） -->
+    <div id="subtask-context-menu" class="context-menu">
+        <div class="context-menu-item" onclick="addSubtaskAbove()"><i class="fas fa-arrow-up"></i>上にサブタスク追加</div>
+        <div class="context-menu-item" onclick="addSubtaskBelow()"><i class="fas fa-arrow-down"></i>下にサブタスク追加</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="copySubtaskAbove()"><i class="fas fa-level-up-alt"></i>コピーして上に追加</div>
+        <div class="context-menu-item" onclick="copySubtaskBelow()"><i class="fas fa-level-down-alt"></i>コピーして下に追加</div>
+        <div class="context-menu-separator"></div>
+        <div class="context-menu-item" onclick="deleteSubtaskFromMenu()" style="color: #dc2626;"><i class="fas fa-trash" style="color: #dc2626;"></i>削除</div>
+    </div>
+
+    <!-- 一括編集モーダル -->
+    <div id="bulk-edit-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeBulkEditModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white"><i class="fas fa-edit mr-2"></i>一括編集</h3>
+                    <button onclick="closeBulkEditModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4"><strong id="bulk-edit-count">0</strong>件のタスクを一括編集します。変更しない項目は空欄のままにしてください。</p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">担当者</label>
+                        <select id="bulk-assignee" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                            <option value="">-- 変更しない --</option>
+                            <option value="山田">山田</option>
+                            <option value="佐藤">佐藤</option>
+                            <option value="鈴木">鈴木</option>
+                            <option value="田中">田中</option>
+                            <option value="高橋">高橋</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">ステータス</label>
+                        <select id="bulk-status" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                            <option value="">-- 変更しない --</option>
+                            <option value="未着手">未着手</option>
+                            <option value="進行中">進行中</option>
+                            <option value="完了">完了</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">進捗</label>
+                        <select id="bulk-progress" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                            <option value="">-- 変更しない --</option>
+                            <option value="0">0%</option>
+                            <option value="25">25%</option>
+                            <option value="50">50%</option>
+                            <option value="75">75%</option>
+                            <option value="100">100%</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">工程</label>
+                        <select id="bulk-process" class="w-full border border-slate-300 rounded-lg px-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-white">
+                            <option value="">-- 変更しない --</option>
+                            <option value="要件定義">要件定義</option>
+                            <option value="設計">設計</option>
+                            <option value="開発">開発</option>
+                            <option value="テスト">テスト</option>
+                            <option value="リリース">リリース</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-end space-x-3">
+                <button onclick="closeBulkEditModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+                <button onclick="applyBulkEdit()" class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg text-sm font-semibold hover:from-indigo-700 hover:to-purple-700 shadow-lg transition-all"><i class="fas fa-check mr-2"></i>適用</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- インポートモーダル -->
+    <div id="import-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeImportModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white"><i class="fas fa-file-import mr-2"></i>タスクインポート</h3>
+                    <button onclick="closeImportModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <!-- ファイル選択エリア -->
+                <div id="import-drop-zone" class="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-emerald-400 hover:bg-emerald-50 transition-all cursor-pointer mb-4">
+                    <i class="fas fa-cloud-upload-alt text-4xl text-slate-400 mb-3"></i>
+                    <p class="text-slate-600 font-medium">ファイルをドラッグ&ドロップ</p>
+                    <p class="text-slate-400 text-sm mt-1">または</p>
+                    <label class="inline-block mt-3 px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 cursor-pointer">
+                        ファイルを選択
+                        <input type="file" accept=".csv,.xlsx,.xls" class="hidden" onchange="handleImportFile(event)">
+                    </label>
+                    <p class="text-slate-400 text-xs mt-3">対応形式: CSV, Excel (.xlsx, .xls)</p>
+                </div>
+                <!-- テンプレートダウンロード -->
+                <div class="flex items-center justify-between bg-slate-50 rounded-lg p-3 mb-4">
+                    <span class="text-sm text-slate-600"><i class="fas fa-info-circle mr-2 text-blue-500"></i>インポート用テンプレートをダウンロード</span>
+                    <button onclick="downloadTemplate()" class="px-3 py-1.5 border border-slate-300 rounded text-sm font-medium text-slate-700 hover:bg-white">
+                        <i class="fas fa-download mr-1"></i>テンプレート
+                    </button>
+                </div>
+                <!-- インポートプレビュー -->
+                <div id="import-preview" class="hidden">
+                    <h4 class="text-sm font-bold text-slate-700 mb-2"><i class="fas fa-eye mr-2"></i>プレビュー</h4>
+                    <div class="max-h-48 overflow-auto border border-slate-200 rounded-lg">
+                        <table class="w-full text-xs">
+                            <thead class="bg-slate-100 sticky top-0">
+                                <tr id="import-preview-header"></tr>
+                            </thead>
+                            <tbody id="import-preview-body"></tbody>
+                        </table>
+                    </div>
+                    <p class="text-sm text-slate-500 mt-2"><span id="import-row-count">0</span>件のデータが読み込まれました</p>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-end space-x-3">
+                <button onclick="closeImportModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+                <button id="import-execute-btn" onclick="executeImport()" class="px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-lg text-sm font-semibold hover:from-emerald-700 hover:to-teal-700 shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fas fa-check mr-2"></i>インポート実行
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- エクスポートモーダル -->
+    <div id="export-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeExportModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white"><i class="fas fa-file-export mr-2"></i>タスクエクスポート</h3>
+                    <button onclick="closeExportModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6">
+                <p class="text-sm text-slate-600 mb-4">エクスポート形式を選択してください</p>
+                <div class="space-y-3">
+                    <label class="flex items-center p-4 border border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-all">
+                        <input type="radio" name="export-format" value="csv" checked class="mr-3">
+                        <div class="flex-1">
+                            <span class="font-medium text-slate-800"><i class="fas fa-file-csv mr-2 text-green-600"></i>CSV形式</span>
+                            <p class="text-xs text-slate-500 mt-1">カンマ区切りテキスト（Excel, Googleスプレッドシート対応）</p>
+                        </div>
+                    </label>
+                    <label class="flex items-center p-4 border border-slate-200 rounded-xl hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-all">
+                        <input type="radio" name="export-format" value="excel" class="mr-3">
+                        <div class="flex-1">
+                            <span class="font-medium text-slate-800"><i class="fas fa-file-excel mr-2 text-emerald-600"></i>Excel形式</span>
+                            <p class="text-xs text-slate-500 mt-1">Microsoft Excel (.xlsx)</p>
+                        </div>
+                    </label>
+                </div>
+                <div class="mt-4 p-3 bg-slate-50 rounded-lg">
+                    <p class="text-sm text-slate-600"><i class="fas fa-info-circle mr-2 text-blue-500"></i>現在 <strong id="export-count">0</strong> 件のタスクがエクスポートされます</p>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-end space-x-3">
+                <button onclick="closeExportModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+                <button onclick="executeExport()" class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all">
+                    <i class="fas fa-download mr-2"></i>エクスポート
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 一括日付更新モーダル -->
+    <div id="bulk-date-modal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeBulkDateModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white"><i class="fas fa-calendar-alt mr-2"></i>一括日付更新</h3>
+                    <button onclick="closeBulkDateModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <p class="text-sm font-medium text-amber-800 mb-1"><i class="fas fa-play mr-1"></i>開始タスク（編集したタスク）</p>
+                    <p id="bulk-start-task-display" class="text-sm text-amber-700">-</p>
+                    <input type="hidden" id="bulk-start-task" value="">
+                </div>
+                <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p class="text-sm font-medium text-blue-800 mb-1"><i class="fas fa-stop mr-1"></i>終了タスク</p>
+                    <p id="bulk-end-task-display" class="text-sm text-blue-700">指定なし（最後まで）</p>
+                    <input type="hidden" id="bulk-end-task" value="">
+                    <button onclick="startEndTaskSelection()" class="mt-2 px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors">
+                        <i class="fas fa-mouse-pointer mr-1"></i>一覧から選択
+                    </button>
+                    <button onclick="clearEndTaskSelection()" class="mt-2 ml-2 px-3 py-1 text-xs border border-slate-300 text-slate-600 rounded hover:bg-slate-100 transition-colors">
+                        <i class="fas fa-times mr-1"></i>クリア
+                    </button>
+                </div>
+                <div class="flex items-center">
+                    <input type="checkbox" id="bulk-exclude-weekends" checked class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                    <label for="bulk-exclude-weekends" class="ml-2 text-sm text-slate-700">土日を除外（営業日ベース）</label>
+                </div>
+                <div class="p-3 bg-slate-50 rounded-lg">
+                    <p class="text-xs text-slate-600 mb-2"><i class="fas fa-info-circle mr-1 text-blue-500"></i>処理内容</p>
+                    <ul class="text-xs text-slate-500 space-y-1 ml-4 list-disc">
+                        <li>開始タスクの日付を起点に、後続タスクの日付を連続割り当て</li>
+                        <li>メンバー → 工程 → タスク順でソート</li>
+                        <li>メンバーが変わると開始タスクの日付にリセット</li>
+                        <li>サブタスクは親タスクの開始日から連続割り当て</li>
+                        <li>親タスクの終了日はサブタスクの最終日に合わせる</li>
+                        <li>ステータスが「完了」のタスクは除外</li>
+                    </ul>
+                </div>
+                <div id="bulk-date-preview" class="hidden p-3 bg-blue-50 rounded-lg max-h-40 overflow-y-auto">
+                    <p class="text-xs text-blue-700 font-medium mb-2"><i class="fas fa-eye mr-1"></i>対象タスク</p>
+                    <div id="bulk-date-preview-content" class="text-xs text-slate-600"></div>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between">
+                <button onclick="previewBulkDate()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                    <i class="fas fa-eye mr-1"></i>プレビュー
+                </button>
+                <div class="flex space-x-3">
+                    <button onclick="closeBulkDateModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+                    <button onclick="executeBulkDateUpdate()" class="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-lg transition-all">
+                        <i class="fas fa-check mr-2"></i>更新実行
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 終了タスク選択モーダル -->
+    <div id="end-task-select-modal" class="fixed inset-0 z-[60] hidden">
+        <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeEndTaskSelectModal()"></div>
+        <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-hidden">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-600 px-6 py-4">
+                <div class="flex items-center justify-between">
+                    <h3 class="text-lg font-bold text-white"><i class="fas fa-stop mr-2"></i>終了タスクを選択</h3>
+                    <button onclick="closeEndTaskSelectModal()" class="text-white/80 hover:text-white transition-colors">
+                        <i class="fas fa-times text-xl"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="p-4">
+                <p class="text-sm text-slate-600 mb-3">一括更新の終了タスク（またはサブタスク）をクリックして選択してください</p>
+                <div class="max-h-[70vh] overflow-y-auto border border-slate-200 rounded-lg">
+                    <table class="w-full text-sm">
+                        <thead class="bg-slate-100 sticky top-0 z-10">
+                            <tr>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600 w-16">No</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600 w-20">工程</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600">タスク名</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600 w-16">担当者</th>
+                                <th class="px-3 py-2 text-left text-xs font-semibold text-slate-600 w-20">ステータス</th>
+                            </tr>
+                        </thead>
+                        <tbody id="end-task-select-tbody">
+                            <!-- JSで生成 -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="bg-slate-50 px-6 py-4 border-t border-slate-200 flex justify-end">
+                <button onclick="closeEndTaskSelectModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // タスクデータ（営業工数・原価・出来高フィールド追加）
+        let tasks = [
+            { id: 1, process: '要件定義', screen: '', name: 'ヒアリング', assignee: '山田', status: '完了', salesManDays: 1, manDays: 2, startDate: '2024-01-15', endDate: '2024-01-25', plannedCost: 200000, actualManDays: 2, actualStartDate: '2024-01-15', actualEndDate: '2024-01-24', actualCost: 200000, progress: 100, delay: 0, note: '', subtasks: [
+                { id: 's1-1', name: '顧客へのヒアリング日程調整', assignee: '佐藤', status: '完了', salesManDays: 0.5, manDays: 0.5, startDate: '2024-01-15', endDate: '2024-01-16', plannedCost: 50000, actualManDays: 0.5, actualStartDate: '2024-01-15', actualEndDate: '2024-01-16', actualCost: 50000, progress: 100, delay: 0, note: '' },
+                { id: 's1-2', name: 'ヒアリングシート作成', assignee: '山田', status: '完了', salesManDays: 0.5, manDays: 1, startDate: '2024-01-17', endDate: '2024-01-20', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-01-17', actualEndDate: '2024-01-20', actualCost: 100000, progress: 100, delay: 0, note: '' },
+                { id: 's1-3', name: '議事録作成', assignee: '鈴木', status: '完了', salesManDays: 0, manDays: 0.5, startDate: '2024-01-21', endDate: '2024-01-25', plannedCost: 50000, actualManDays: 0.5, actualStartDate: '2024-01-21', actualEndDate: '2024-01-24', actualCost: 50000, progress: 100, delay: 0, note: '' }
+            ] },
+            { id: 2, process: '要件定義', screen: '', name: '要件書作成', assignee: '山田', status: '完了', salesManDays: 0.5, manDays: 3, startDate: '2024-01-26', endDate: '2024-02-15', plannedCost: 300000, actualManDays: 3, actualStartDate: '2024-01-25', actualEndDate: '2024-02-14', actualCost: 300000, progress: 100, delay: 0, note: '', subtasks: [
+                { id: 's2-1', name: '要件一覧の整理', assignee: '山田', status: '完了', salesManDays: 0.5, manDays: 1, startDate: '2024-01-26', endDate: '2024-01-31', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-01-25', actualEndDate: '2024-01-30', actualCost: 100000, progress: 100, delay: 0, note: '' },
+                { id: 's2-2', name: '優先度の設定', assignee: '高橋', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-02-01', endDate: '2024-02-07', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-02-01', actualEndDate: '2024-02-07', actualCost: 100000, progress: 100, delay: 0, note: '' },
+                { id: 's2-3', name: '顧客への確認依頼', assignee: '佐藤', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-02-08', endDate: '2024-02-15', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-02-08', actualEndDate: '2024-02-14', actualCost: 100000, progress: 100, delay: 0, note: '' }
+            ] },
+            { id: 3, process: '設計', screen: '', name: '画面設計', assignee: '佐藤', status: '完了', salesManDays: 0, manDays: 4, startDate: '2024-02-16', endDate: '2024-03-10', plannedCost: 400000, actualManDays: 5, actualStartDate: '2024-02-15', actualEndDate: '2024-03-12', actualCost: 500000, progress: 100, delay: 2, note: '仕様変更対応', subtasks: [
+                { id: 's3-1', name: 'ワイヤーフレーム作成', assignee: '田中', status: '完了', salesManDays: 0, manDays: 2, startDate: '2024-02-16', endDate: '2024-02-25', plannedCost: 200000, actualManDays: 2, actualStartDate: '2024-02-15', actualEndDate: '2024-02-25', actualCost: 200000, progress: 100, delay: 0, note: '' },
+                { id: 's3-2', name: 'デザインレビュー', assignee: '山田', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-02-26', endDate: '2024-03-01', plannedCost: 100000, actualManDays: 1.5, actualStartDate: '2024-02-26', actualEndDate: '2024-03-05', actualCost: 150000, progress: 100, delay: 2, note: '修正多め' },
+                { id: 's3-3', name: 'フィードバック反映', assignee: '田中', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-03-02', endDate: '2024-03-10', plannedCost: 100000, actualManDays: 1.5, actualStartDate: '2024-03-06', actualEndDate: '2024-03-12', actualCost: 150000, progress: 100, delay: 2, note: '' }
+            ] },
+            { id: 4, process: '設計', screen: '', name: 'DB設計', assignee: '鈴木', status: '完了', salesManDays: 0, manDays: 3, startDate: '2024-03-01', endDate: '2024-03-20', plannedCost: 300000, actualManDays: 3, actualStartDate: '2024-03-01', actualEndDate: '2024-03-20', actualCost: 300000, progress: 100, delay: 0, note: '', subtasks: [
+                { id: 's4-1', name: 'テーブル定義書作成', assignee: '佐藤', status: '完了', salesManDays: 0, manDays: 2, startDate: '2024-03-01', endDate: '2024-03-12', plannedCost: 200000, actualManDays: 2, actualStartDate: '2024-03-01', actualEndDate: '2024-03-12', actualCost: 200000, progress: 100, delay: 0, note: '' },
+                { id: 's4-2', name: 'インデックス設計', assignee: '高橋', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-03-13', endDate: '2024-03-20', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-03-13', actualEndDate: '2024-03-20', actualCost: 100000, progress: 100, delay: 0, note: '' }
+            ] },
+            { id: 5, process: '設計', screen: '', name: 'API設計', assignee: '鈴木', status: '完了', salesManDays: 0, manDays: 3, startDate: '2024-03-11', endDate: '2024-03-31', plannedCost: 300000, actualManDays: 3, actualStartDate: '2024-03-13', actualEndDate: '2024-03-31', actualCost: 300000, progress: 100, delay: 0, note: '', subtasks: [
+                { id: 's5-1', name: 'エンドポイント一覧作成', assignee: '鈴木', status: '完了', salesManDays: 0, manDays: 1.5, startDate: '2024-03-11', endDate: '2024-03-20', plannedCost: 150000, actualManDays: 1.5, actualStartDate: '2024-03-13', actualEndDate: '2024-03-22', actualCost: 150000, progress: 100, delay: 0, note: '' },
+                { id: 's5-2', name: 'リクエスト/レスポンス定義', assignee: '田中', status: '完了', salesManDays: 0, manDays: 1.5, startDate: '2024-03-21', endDate: '2024-03-31', plannedCost: 150000, actualManDays: 1.5, actualStartDate: '2024-03-23', actualEndDate: '2024-03-31', actualCost: 150000, progress: 100, delay: 0, note: '' }
+            ] },
+            { id: 6, process: '開発', screen: 'ログイン画面', name: 'ログイン画面実装', assignee: '田中', status: '完了', salesManDays: 0, manDays: 2, startDate: '2024-04-01', endDate: '2024-04-05', plannedCost: 200000, actualManDays: 2, actualStartDate: '2024-04-01', actualEndDate: '2024-04-05', actualCost: 200000, progress: 100, delay: 0, note: '', subtasks: [
+                { id: 's6-1', name: 'ログインフォームUI実装', assignee: '田中', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-04-01', endDate: '2024-04-03', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-04-01', actualEndDate: '2024-04-03', actualCost: 100000, progress: 100, delay: 0, note: '' },
+                { id: 's6-2', name: '入力バリデーション', assignee: '鈴木', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-04-04', endDate: '2024-04-05', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-04-04', actualEndDate: '2024-04-05', actualCost: 100000, progress: 100, delay: 0, note: '' }
+            ] },
+            { id: 7, process: '開発', screen: 'ダッシュボード', name: 'ダッシュボード実装', assignee: '田中', status: '完了', salesManDays: 0, manDays: 3, startDate: '2024-04-06', endDate: '2024-04-12', plannedCost: 300000, actualManDays: 4, actualStartDate: '2024-04-06', actualEndDate: '2024-04-14', actualCost: 400000, progress: 100, delay: 2, note: 'デザイン調整', subtasks: [
+                { id: 's7-1', name: 'ウィジェット配置', assignee: '佐藤', status: '完了', salesManDays: 0, manDays: 1.5, startDate: '2024-04-06', endDate: '2024-04-09', plannedCost: 150000, actualManDays: 2, actualStartDate: '2024-04-06', actualEndDate: '2024-04-10', actualCost: 200000, progress: 100, delay: 1, note: '' },
+                { id: 's7-2', name: 'グラフコンポーネント実装', assignee: '田中', status: '完了', salesManDays: 0, manDays: 1.5, startDate: '2024-04-10', endDate: '2024-04-12', plannedCost: 150000, actualManDays: 2, actualStartDate: '2024-04-11', actualEndDate: '2024-04-14', actualCost: 200000, progress: 100, delay: 2, note: 'デザイン調整' }
+            ] },
+            { id: 8, process: '開発', screen: '一覧画面', name: '一覧画面実装', assignee: '田中', status: '進行中', salesManDays: 0, manDays: 3, startDate: '2024-04-13', endDate: '2024-04-20', plannedCost: 300000, actualManDays: '', actualStartDate: '2024-04-15', actualEndDate: '', actualCost: 150000, progress: 50, delay: 2, note: '', subtasks: [
+                { id: 's8-1', name: 'テーブルヘッダー実装', assignee: '田中', status: '完了', salesManDays: 0, manDays: 1, startDate: '2024-04-13', endDate: '2024-04-15', plannedCost: 100000, actualManDays: 1, actualStartDate: '2024-04-15', actualEndDate: '2024-04-17', actualCost: 100000, progress: 100, delay: 2, note: '' },
+                { id: 's8-2', name: '行クリックイベント', assignee: '鈴木', status: '進行中', salesManDays: 0, manDays: 1, startDate: '2024-04-16', endDate: '2024-04-18', plannedCost: 100000, actualManDays: '', actualStartDate: '2024-04-18', actualEndDate: '', actualCost: 50000, progress: 50, delay: 2, note: '' },
+                { id: 's8-3', name: 'ソート機能', assignee: '佐藤', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-04-19', endDate: '2024-04-20', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 9, process: '開発', screen: '詳細画面', name: '詳細画面実装', assignee: '田中', status: '未着手', salesManDays: 0, manDays: 2, startDate: '2024-04-21', endDate: '2024-04-28', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '', subtasks: [
+                { id: 's9-1', name: '詳細情報表示', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-04-21', endDate: '2024-04-24', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' },
+                { id: 's9-2', name: '編集フォーム', assignee: '田中', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-04-25', endDate: '2024-04-28', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 10, process: '開発', screen: 'API', name: 'バックエンドAPI実装', assignee: '鈴木', status: '進行中', salesManDays: 0, manDays: 10, startDate: '2024-04-05', endDate: '2024-05-10', plannedCost: 1000000, actualManDays: '', actualStartDate: '2024-04-05', actualEndDate: '', actualCost: 450000, progress: 45, delay: 0, note: '', subtasks: [
+                { id: 's10-1', name: '認証API実装', assignee: '佐藤', status: '完了', salesManDays: 0, manDays: 3, startDate: '2024-04-05', endDate: '2024-04-15', plannedCost: 300000, actualManDays: 3, actualStartDate: '2024-04-05', actualEndDate: '2024-04-15', actualCost: 300000, progress: 100, delay: 0, note: '' },
+                { id: 's10-2', name: 'CRUD API実装', assignee: '田中', status: '進行中', salesManDays: 0, manDays: 4, startDate: '2024-04-16', endDate: '2024-04-30', plannedCost: 400000, actualManDays: '', actualStartDate: '2024-04-16', actualEndDate: '', actualCost: 150000, progress: 40, delay: 0, note: '' },
+                { id: 's10-3', name: 'バリデーション処理', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 3, startDate: '2024-05-01', endDate: '2024-05-10', plannedCost: 300000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 11, process: '開発', screen: '', name: '単体テスト', assignee: '高橋', status: '進行中', salesManDays: 0, manDays: 5, startDate: '2024-04-15', endDate: '2024-05-20', plannedCost: 500000, actualManDays: '', actualStartDate: '2024-04-17', actualEndDate: '', actualCost: 150000, progress: 30, delay: 2, note: '', subtasks: [
+                { id: 's11-1', name: 'テストケース作成', assignee: '田中', status: '完了', salesManDays: 0, manDays: 2, startDate: '2024-04-15', endDate: '2024-04-25', plannedCost: 200000, actualManDays: 2, actualStartDate: '2024-04-17', actualEndDate: '2024-04-27', actualCost: 200000, progress: 100, delay: 2, note: '' },
+                { id: 's11-2', name: 'ユニットテスト実行', assignee: '鈴木', status: '進行中', salesManDays: 0, manDays: 2, startDate: '2024-04-26', endDate: '2024-05-10', plannedCost: 200000, actualManDays: '', actualStartDate: '2024-04-28', actualEndDate: '', actualCost: 100000, progress: 50, delay: 2, note: '' },
+                { id: 's11-3', name: 'カバレッジ確認', assignee: '佐藤', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-05-11', endDate: '2024-05-20', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 12, process: 'テスト', screen: '', name: '結合テスト', assignee: '高橋', status: '未着手', salesManDays: 0, manDays: 4, startDate: '2024-05-21', endDate: '2024-06-05', plannedCost: 400000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '', subtasks: [
+                { id: 's12-1', name: '結合テストシナリオ作成', assignee: '高橋', status: '未着手', salesManDays: 0, manDays: 2, startDate: '2024-05-21', endDate: '2024-05-28', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' },
+                { id: 's12-2', name: 'テスト実施', assignee: '山田', status: '未着手', salesManDays: 0, manDays: 2, startDate: '2024-05-29', endDate: '2024-06-05', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 13, process: 'テスト', screen: '', name: 'UAT', assignee: '山田', status: '未着手', salesManDays: 0.5, manDays: 4, startDate: '2024-06-06', endDate: '2024-06-15', plannedCost: 400000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '', subtasks: [
+                { id: 's13-1', name: 'UATシナリオ作成', assignee: '山田', status: '未着手', salesManDays: 0.5, manDays: 2, startDate: '2024-06-06', endDate: '2024-06-10', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' },
+                { id: 's13-2', name: '顧客テスト支援', assignee: '佐藤', status: '未着手', salesManDays: 0, manDays: 2, startDate: '2024-06-11', endDate: '2024-06-15', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 14, process: 'リリース', screen: '', name: '本番環境構築', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 2, startDate: '2024-06-16', endDate: '2024-06-25', plannedCost: 200000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '', subtasks: [
+                { id: 's14-1', name: 'サーバー構築', assignee: '田中', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-06-16', endDate: '2024-06-20', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' },
+                { id: 's14-2', name: 'ネットワーク設定', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-06-21', endDate: '2024-06-25', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+            { id: 15, process: 'リリース', screen: '', name: 'デプロイ・公開', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 1, startDate: '2024-06-26', endDate: '2024-06-30', plannedCost: 100000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '', subtasks: [
+                { id: 's15-1', name: 'デプロイ作業', assignee: '田中', status: '未着手', salesManDays: 0, manDays: 0.5, startDate: '2024-06-26', endDate: '2024-06-27', plannedCost: 50000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' },
+                { id: 's15-2', name: '動作確認', assignee: '鈴木', status: '未着手', salesManDays: 0, manDays: 0.5, startDate: '2024-06-28', endDate: '2024-06-30', plannedCost: 50000, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' }
+            ] },
+        ];
+
+        let isEditMode = false;
+        let selectedRowIndex = null;
+        let selectedSubtaskIndex = null;
+        let originalTasks = [];
+        let undoHistory = [];
+        let copiedTasks = [];
+        const MAX_UNDO = 20;
+
+        // 日付編集用
+        let dateEditedTaskIndex = null;
+        let dateEditedSubtaskIndex = null;
+        let dateEditedRows = new Set(); // 編集されたタスク行のインデックスを保持
+
+        // 終了タスク選択
+        let selectedEndTaskIndex = null;
+        let selectedEndSubtaskIndex = null;
+
+        // 履歴に追加
+        function saveToHistory() {
+            undoHistory.push(JSON.parse(JSON.stringify(tasks)));
+            if (undoHistory.length > MAX_UNDO) {
+                undoHistory.shift();
+            }
+            updateUndoButton();
+        }
+
+        // 元に戻す
+        function undoChanges() {
+            if (undoHistory.length > 0) {
+                tasks = undoHistory.pop();
+                renderTable();
+                updateUndoButton();
+            }
+        }
+
+        // 元に戻すボタン更新
+        function updateUndoButton() {
+            const btn = document.getElementById('undo-btn');
+            btn.disabled = undoHistory.length === 0;
+        }
+
+        // テーブル描画
+        let draggedRowIndex = null;
+
+        const formatCost = (cost) => cost ? '¥' + Number(cost).toLocaleString() : '-';
+
+        // サブタスク追加（右クリックメニューから）
+        function addSubtaskFromMenu() {
+            if (selectedRowIndex === null) return;
+            document.getElementById('context-menu').classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            addSubtask(selectedRowIndex);
+        }
+
+        // サブタスク追加
+        function addSubtask(taskIndex) {
+            saveToHistory();
+            if (!tasks[taskIndex].subtasks) {
+                tasks[taskIndex].subtasks = [];
+            }
+            const newId = 's' + tasks[taskIndex].id + '-' + (tasks[taskIndex].subtasks.length + 1);
+            tasks[taskIndex].subtasks.push({
+                id: newId,
+                name: '',
+                assignee: '',
+                status: '未着手',
+                salesManDays: 0,
+                manDays: 0,
+                startDate: '',
+                endDate: '',
+                plannedCost: 0,
+                actualManDays: '',
+                actualStartDate: '',
+                actualEndDate: '',
+                actualCost: 0,
+                progress: 0,
+                delay: 0,
+                note: ''
+            });
+            renderTable();
+        }
+
+        // サブタスク更新
+        function updateSubtask(taskIndex, subtaskIndex, field, value) {
+            saveToHistory();
+            if (['salesManDays', 'manDays', 'actualManDays', 'progress', 'plannedCost', 'actualCost', 'delay'].includes(field)) {
+                value = parseFloat(value) || (field === 'actualManDays' ? '' : 0);
+            }
+            tasks[taskIndex].subtasks[subtaskIndex][field] = value;
+
+            // サブタスクの開始日または終了日が変更されたとき、親タスクの日付を連動更新
+            if (field === 'startDate' || field === 'endDate') {
+                updateParentTaskDates(taskIndex);
+            }
+        }
+
+        // 親タスクの日付をサブタスクに合わせて更新
+        function updateParentTaskDates(taskIndex) {
+            const task = tasks[taskIndex];
+            if (!task.subtasks || task.subtasks.length === 0) return;
+
+            let updated = false;
+
+            // サブタスクの最小開始日と最大終了日を取得
+            let minStartDate = null;
+            let maxEndDate = null;
+
+            task.subtasks.forEach(subtask => {
+                if (subtask.startDate) {
+                    if (!minStartDate || subtask.startDate < minStartDate) {
+                        minStartDate = subtask.startDate;
+                    }
+                }
+                if (subtask.endDate) {
+                    if (!maxEndDate || subtask.endDate > maxEndDate) {
+                        maxEndDate = subtask.endDate;
+                    }
+                }
+            });
+
+            // 親タスクの開始日がサブタスクの最小開始日より後なら更新
+            if (minStartDate && (!task.startDate || task.startDate > minStartDate)) {
+                task.startDate = minStartDate;
+                updated = true;
+            }
+
+            // 親タスクの終了日がサブタスクの最大終了日より前なら更新
+            if (maxEndDate && (!task.endDate || task.endDate < maxEndDate)) {
+                task.endDate = maxEndDate;
+                updated = true;
+            }
+
+            // 更新があった場合、画面の入力欄も更新
+            if (updated) {
+                const taskRow = document.querySelector(`.task-row[data-index="${taskIndex}"]`);
+                if (taskRow) {
+                    const startDateInput = taskRow.querySelector('input.edit-input[data-field="startDate"]');
+                    const endDateInput = taskRow.querySelector('input.edit-input[data-field="endDate"]');
+                    if (startDateInput) startDateInput.value = task.startDate || '';
+                    if (endDateInput) endDateInput.value = task.endDate || '';
+                }
+            }
+        }
+
+        // サブタスク削除
+        function removeSubtask(taskIndex, subtaskIndex) {
+            saveToHistory();
+            tasks[taskIndex].subtasks.splice(subtaskIndex, 1);
+            renderTable();
+        }
+
+        // サブタスク上に移動
+        function moveSubtaskUp(taskIndex, subtaskIndex) {
+            if (subtaskIndex <= 0) return;
+            saveToHistory();
+            const subtasks = tasks[taskIndex].subtasks;
+            [subtasks[subtaskIndex - 1], subtasks[subtaskIndex]] = [subtasks[subtaskIndex], subtasks[subtaskIndex - 1]];
+            renderTable();
+        }
+
+        // サブタスク下に移動
+        function moveSubtaskDown(taskIndex, subtaskIndex) {
+            const subtasks = tasks[taskIndex].subtasks;
+            if (subtaskIndex >= subtasks.length - 1) return;
+            saveToHistory();
+            [subtasks[subtaskIndex], subtasks[subtaskIndex + 1]] = [subtasks[subtaskIndex + 1], subtasks[subtaskIndex]];
+            renderTable();
+        }
+
+        // サブタスク用右クリックメニュー表示
+        function showSubtaskContextMenu(x, y) {
+            const menu = document.getElementById('subtask-context-menu');
+            const taskMenu = document.getElementById('context-menu');
+            taskMenu.classList.remove('show');
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            menu.classList.add('show');
+        }
+
+        // 上にサブタスク追加
+        function addSubtaskAbove() {
+            if (selectedRowIndex === null || selectedSubtaskIndex === null) return;
+            document.getElementById('subtask-context-menu').classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const task = tasks[selectedRowIndex];
+            const newId = 's' + task.id + '-' + Date.now();
+            const newSubtask = {
+                id: newId,
+                name: '',
+                assignee: '',
+                status: '未着手',
+                salesManDays: 0,
+                manDays: 0,
+                startDate: '',
+                endDate: '',
+                plannedCost: 0,
+                actualManDays: '',
+                actualStartDate: '',
+                actualEndDate: '',
+                actualCost: 0,
+                progress: 0,
+                delay: 0,
+                note: ''
+            };
+            task.subtasks.splice(selectedSubtaskIndex, 0, newSubtask);
+            renderTable();
+        }
+
+        // 下にサブタスク追加
+        function addSubtaskBelow() {
+            if (selectedRowIndex === null || selectedSubtaskIndex === null) return;
+            document.getElementById('subtask-context-menu').classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const task = tasks[selectedRowIndex];
+            const newId = 's' + task.id + '-' + Date.now();
+            const newSubtask = {
+                id: newId,
+                name: '',
+                assignee: '',
+                status: '未着手',
+                salesManDays: 0,
+                manDays: 0,
+                startDate: '',
+                endDate: '',
+                plannedCost: 0,
+                actualManDays: '',
+                actualStartDate: '',
+                actualEndDate: '',
+                actualCost: 0,
+                progress: 0,
+                delay: 0,
+                note: ''
+            };
+            task.subtasks.splice(selectedSubtaskIndex + 1, 0, newSubtask);
+            renderTable();
+        }
+
+        // コピーして上にサブタスク追加
+        function copySubtaskAbove() {
+            if (selectedRowIndex === null || selectedSubtaskIndex === null) return;
+            document.getElementById('subtask-context-menu').classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const task = tasks[selectedRowIndex];
+            const original = task.subtasks[selectedSubtaskIndex];
+            const newSubtask = JSON.parse(JSON.stringify(original));
+            newSubtask.id = 's' + task.id + '-' + Date.now();
+            task.subtasks.splice(selectedSubtaskIndex, 0, newSubtask);
+            renderTable();
+        }
+
+        // コピーして下にサブタスク追加
+        function copySubtaskBelow() {
+            if (selectedRowIndex === null || selectedSubtaskIndex === null) return;
+            document.getElementById('subtask-context-menu').classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const task = tasks[selectedRowIndex];
+            const original = task.subtasks[selectedSubtaskIndex];
+            const newSubtask = JSON.parse(JSON.stringify(original));
+            newSubtask.id = 's' + task.id + '-' + Date.now();
+            task.subtasks.splice(selectedSubtaskIndex + 1, 0, newSubtask);
+            renderTable();
+        }
+
+        // サブタスク削除（右クリックメニューから）
+        function deleteSubtaskFromMenu() {
+            if (selectedRowIndex === null || selectedSubtaskIndex === null) return;
+            document.getElementById('subtask-context-menu').classList.remove('show');
+            removeSubtask(selectedRowIndex, selectedSubtaskIndex);
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('task-tbody');
+            tbody.innerHTML = '';
+
+            tasks.forEach((task, index) => {
+                const row = document.createElement('tr');
+                row.className = 'task-row border-b border-slate-100 hover:bg-slate-50 transition-colors';
+                row.dataset.index = index;
+
+                if (copiedTasks.length > 0 && copiedTasks.some(t => t.id === task.id)) {
+                    row.classList.add('copied');
+                }
+
+                // 完了行の背景色
+                if (task.status === '完了') {
+                    row.classList.add('completed-row');
+                }
+
+                let statusClass = 'status-not-started';
+                if (task.status === '進行中') statusClass = 'status-in-progress';
+                else if (task.status === '完了') statusClass = 'status-completed';
+                if (task.delay > 0 && task.status !== '完了') statusClass = 'status-delayed';
+
+                let delayText = '-';
+                let delayClass = 'text-slate-400';
+                if (task.delay > 0) { delayText = task.delay + '日遅れ'; delayClass = 'text-rose-600 font-semibold'; }
+                else if (task.delay < 0) { delayText = Math.abs(task.delay) + '日先行'; delayClass = 'text-emerald-600 font-semibold'; }
+
+                if (isEditMode) {
+                    row.draggable = true;
+                    row.innerHTML = `
+                        <td class="px-2 py-2 text-center border-r border-slate-100"><input type="checkbox" class="row-checkbox rounded border-slate-300"></td>
+                        <td class="px-2 py-2 text-center border-r border-slate-100 drag-cell" style="cursor: grab;">
+                            <i class="fas fa-grip-vertical drag-handle"></i>
+                        </td>
+                        <td class="px-2 py-2 text-center text-sm text-slate-500 border-r border-slate-100">${index + 1}</td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                            <select class="edit-input text-xs" data-field="process">
+                                <option value="">-</option>
+                                <option value="要件定義" ${task.process === '要件定義' ? 'selected' : ''}>要件定義</option>
+                                <option value="設計" ${task.process === '設計' ? 'selected' : ''}>設計</option>
+                                <option value="開発" ${task.process === '開発' ? 'selected' : ''}>開発</option>
+                                <option value="テスト" ${task.process === 'テスト' ? 'selected' : ''}>テスト</option>
+                                <option value="リリース" ${task.process === 'リリース' ? 'selected' : ''}>リリース</option>
+                            </select>
+                        </td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell"><input type="text" class="edit-input text-xs" value="${task.name}" data-field="name"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                            <select class="edit-input text-xs text-center" data-field="assignee">
+                                <option value="">-</option>
+                                <option value="山田" ${task.assignee === '山田' ? 'selected' : ''}>山田</option>
+                                <option value="佐藤" ${task.assignee === '佐藤' ? 'selected' : ''}>佐藤</option>
+                                <option value="鈴木" ${task.assignee === '鈴木' ? 'selected' : ''}>鈴木</option>
+                                <option value="田中" ${task.assignee === '田中' ? 'selected' : ''}>田中</option>
+                                <option value="高橋" ${task.assignee === '高橋' ? 'selected' : ''}>高橋</option>
+                            </select>
+                        </td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                            <select class="edit-input text-xs text-center" data-field="status">
+                                <option value="未着手" ${task.status === '未着手' ? 'selected' : ''}>未着手</option>
+                                <option value="進行中" ${task.status === '進行中' ? 'selected' : ''}>進行中</option>
+                                <option value="完了" ${task.status === '完了' ? 'selected' : ''}>完了</option>
+                            </select>
+                        </td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50"><input type="number" class="edit-input text-xs text-center" value="${task.salesManDays || ''}" data-field="salesManDays" min="0" step="0.5"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50"><input type="number" class="edit-input text-xs text-center" value="${task.manDays}" data-field="manDays" min="0" step="0.5"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50"><input type="date" class="edit-input text-xs" value="${task.startDate}" data-field="startDate"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50"><input type="date" class="edit-input text-xs" value="${task.endDate}" data-field="endDate"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50"><input type="number" class="edit-input text-xs text-right" value="${task.plannedCost || ''}" data-field="plannedCost" min="0"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50"><input type="number" class="edit-input text-xs text-center" value="${task.actualManDays || ''}" data-field="actualManDays" min="0" step="0.5"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50"><input type="date" class="edit-input text-xs" value="${task.actualStartDate || ''}" data-field="actualStartDate"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50"><input type="date" class="edit-input text-xs" value="${task.actualEndDate || ''}" data-field="actualEndDate"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50"><input type="number" class="edit-input text-xs text-right" value="${task.actualCost || ''}" data-field="actualCost" min="0"></td>
+                        <td class="px-1 py-1 border-r border-slate-100 editable-cell"><input type="number" class="edit-input text-xs text-center" value="${task.progress}" data-field="progress" min="0" max="100"></td>
+                        <td class="px-2 py-2 text-center border-r border-slate-100 text-xs ${delayClass}">${delayText}</td>
+                        <td class="px-1 py-1 editable-cell"><input type="text" class="edit-input text-xs" value="${task.note || ''}" data-field="note"></td>
+                    `;
+                    row.querySelectorAll('.edit-input').forEach(input => {
+                        input.addEventListener('change', (e) => {
+                            saveToHistory();
+                            const field = e.target.dataset.field;
+                            let value = e.target.value;
+                            if (['salesManDays', 'manDays', 'actualManDays', 'progress', 'plannedCost', 'actualCost'].includes(field)) value = parseFloat(value) || '';
+                            tasks[index][field] = value;
+
+                            // 日付フィールドが編集されたらハイライトとボタン表示
+                            if (field === 'startDate' || field === 'endDate') {
+                                onDateEdited(index, null);
+                            }
+                        });
+                    });
+
+                    // ドラッグイベント（行全体で対応）
+                    row.addEventListener('dragstart', (e) => {
+                        draggedRowIndex = index;
+                        row.classList.add('dragging');
+                        e.dataTransfer.effectAllowed = 'move';
+                        e.dataTransfer.setData('text/plain', index);
+                    });
+                    row.addEventListener('dragend', () => {
+                        row.classList.remove('dragging');
+                        draggedRowIndex = null;
+                        document.querySelectorAll('.task-row').forEach(r => r.classList.remove('drag-over'));
+                    });
+                    row.addEventListener('dragover', (e) => {
+                        e.preventDefault();
+                        if (draggedRowIndex !== null && draggedRowIndex !== index) {
+                            row.classList.add('drag-over');
+                        }
+                    });
+                    row.addEventListener('dragleave', () => {
+                        row.classList.remove('drag-over');
+                    });
+                    row.addEventListener('drop', (e) => {
+                        e.preventDefault();
+                        row.classList.remove('drag-over');
+                        if (draggedRowIndex !== null && draggedRowIndex !== index) {
+                            saveToHistory();
+                            const draggedTask = tasks.splice(draggedRowIndex, 1)[0];
+                            tasks.splice(index, 0, draggedTask);
+                            clearSelection();
+                            renderTable();
+                        }
+                    });
+                } else {
+                    row.innerHTML = `
+                        <td class="px-2 py-2 text-center border-r border-slate-100"><input type="checkbox" class="row-checkbox rounded border-slate-300"></td>
+                        <td class="px-2 py-2 text-center border-r border-slate-100">
+                            <i class="fas fa-grip-vertical text-slate-300 text-xs"></i>
+                        </td>
+                        <td class="px-2 py-2 text-center text-xs text-slate-500 border-r border-slate-100">${index + 1}</td>
+                        <td class="px-2 py-2 text-xs text-slate-700 border-r border-slate-100">${task.process}</td>
+                        <td class="px-2 py-2 text-xs text-slate-800 font-medium border-r border-slate-100">${task.name}</td>
+                        <td class="px-2 py-2 text-xs text-slate-600 text-center border-r border-slate-100">${task.assignee || '-'}</td>
+                        <td class="px-2 py-2 text-center border-r border-slate-100"><span class="status-badge ${statusClass}">${task.status}</span></td>
+                        <td class="px-2 py-2 text-xs text-sky-700 text-center border-r border-slate-100 bg-sky-50">${task.salesManDays ? task.salesManDays + '日' : '-'}</td>
+                        <td class="px-2 py-2 text-xs text-sky-700 text-center border-r border-slate-100 bg-sky-50">${task.manDays}日</td>
+                        <td class="px-2 py-2 text-xs text-sky-700 text-center border-r border-slate-100 bg-sky-50">${formatDate(task.startDate)}</td>
+                        <td class="px-2 py-2 text-xs text-sky-700 text-center border-r border-slate-100 bg-sky-50">${formatDate(task.endDate)}</td>
+                        <td class="px-2 py-2 text-xs text-sky-700 text-right border-r border-slate-100 bg-sky-50">${formatCost(task.plannedCost)}</td>
+                        <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${task.actualManDays ? task.actualManDays + '日' : '-'}</td>
+                        <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${formatDate(task.actualStartDate)}</td>
+                        <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${formatDate(task.actualEndDate)}</td>
+                        <td class="px-2 py-2 text-xs text-amber-700 text-right border-r border-slate-100 bg-amber-50">${formatCost(task.actualCost)}</td>
+                        <td class="px-2 py-2 text-center border-r border-slate-100"><span class="text-xs font-semibold ${task.progress === 100 ? 'text-emerald-600' : task.progress > 0 ? 'text-blue-600' : 'text-slate-400'}">${task.progress}%</span></td>
+                        <td class="px-2 py-2 text-xs text-center border-r border-slate-100 ${delayClass}">${delayText}</td>
+                        <td class="px-2 py-2 text-xs text-slate-500">${task.note || '-'}</td>
+                    `;
+                }
+
+                row.addEventListener('contextmenu', (e) => { e.preventDefault(); selectedRowIndex = index; showContextMenu(e.pageX, e.pageY); });
+                row.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('row-checkbox') && !e.target.closest('.drag-cell')) {
+                        selectedRowIndex = index;
+                        document.querySelectorAll('.task-row').forEach(r => r.classList.remove('selected'));
+                        row.classList.add('selected');
+                    }
+                });
+                tbody.appendChild(row);
+
+                // サブタスク行を追加
+                if (task.subtasks && task.subtasks.length > 0) {
+                    task.subtasks.forEach((subtask, stIndex) => {
+                        const subtaskRow = document.createElement('tr');
+                        subtaskRow.className = 'subtask-row border-b border-slate-100 bg-slate-50/50 hover:bg-slate-100 transition-colors';
+                        subtaskRow.dataset.parentIndex = index;
+                        subtaskRow.dataset.subtaskIndex = stIndex;
+
+                        let stStatusClass = 'status-not-started';
+                        if (subtask.status === '進行中') stStatusClass = 'status-in-progress';
+                        else if (subtask.status === '完了') stStatusClass = 'status-completed';
+                        if (subtask.delay > 0 && subtask.status !== '完了') stStatusClass = 'status-delayed';
+
+                        let stDelayText = '-';
+                        let stDelayClass = 'text-slate-400';
+                        if (subtask.delay > 0) { stDelayText = subtask.delay + '日遅れ'; stDelayClass = 'text-rose-600 font-semibold'; }
+                        else if (subtask.delay < 0) { stDelayText = Math.abs(subtask.delay) + '日先行'; stDelayClass = 'text-emerald-600 font-semibold'; }
+
+                        if (isEditMode) {
+                            const isFirst = stIndex === 0;
+                            const isLast = stIndex === task.subtasks.length - 1;
+                            subtaskRow.innerHTML = `
+                                <td class="px-2 py-1 text-center border-r border-slate-100"><input type="checkbox" class="subtask-checkbox rounded border-slate-300" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-1 py-1 text-center border-r border-slate-100">
+                                    <div class="flex flex-col items-center gap-0.5">
+                                        <button type="button" class="text-slate-400 hover:text-blue-600 ${isFirst ? 'opacity-30 cursor-not-allowed' : ''}" onclick="${isFirst ? '' : `moveSubtaskUp(${index}, ${stIndex})`}" ${isFirst ? 'disabled' : ''} title="上に移動">
+                                            <i class="fas fa-caret-up text-sm"></i>
+                                        </button>
+                                        <button type="button" class="text-slate-400 hover:text-blue-600 ${isLast ? 'opacity-30 cursor-not-allowed' : ''}" onclick="${isLast ? '' : `moveSubtaskDown(${index}, ${stIndex})`}" ${isLast ? 'disabled' : ''} title="下に移動">
+                                            <i class="fas fa-caret-down text-sm"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                                <td class="px-2 py-1 text-center text-xs text-slate-400 border-r border-slate-100">${index + 1}-${stIndex + 1}</td>
+                                <td class="px-1 py-1 border-r border-slate-100"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-level-up-alt fa-rotate-90 text-slate-300 mr-2 text-xs"></i>
+                                        <input type="text" class="subtask-edit-input text-xs flex-1 px-1 py-0.5 border border-slate-200 rounded" value="${subtask.name}" data-field="name" data-task="${index}" data-subtask="${stIndex}">
+                                    </div>
+                                </td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                                    <select class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" data-field="assignee" data-task="${index}" data-subtask="${stIndex}">
+                                        <option value="">-</option>
+                                        <option value="山田" ${subtask.assignee === '山田' ? 'selected' : ''}>山田</option>
+                                        <option value="佐藤" ${subtask.assignee === '佐藤' ? 'selected' : ''}>佐藤</option>
+                                        <option value="鈴木" ${subtask.assignee === '鈴木' ? 'selected' : ''}>鈴木</option>
+                                        <option value="田中" ${subtask.assignee === '田中' ? 'selected' : ''}>田中</option>
+                                        <option value="高橋" ${subtask.assignee === '高橋' ? 'selected' : ''}>高橋</option>
+                                    </select>
+                                </td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell">
+                                    <select class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" data-field="status" data-task="${index}" data-subtask="${stIndex}">
+                                        <option value="未着手" ${subtask.status === '未着手' ? 'selected' : ''}>未着手</option>
+                                        <option value="進行中" ${subtask.status === '進行中' ? 'selected' : ''}>進行中</option>
+                                        <option value="完了" ${subtask.status === '完了' ? 'selected' : ''}>完了</option>
+                                    </select>
+                                </td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50/50"><input type="number" class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.salesManDays || ''}" data-field="salesManDays" data-task="${index}" data-subtask="${stIndex}" min="0" step="0.5"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50/50"><input type="number" class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.manDays || ''}" data-field="manDays" data-task="${index}" data-subtask="${stIndex}" min="0" step="0.5"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50/50"><input type="date" class="subtask-edit-input text-xs w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.startDate || ''}" data-field="startDate" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50/50"><input type="date" class="subtask-edit-input text-xs w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.endDate || ''}" data-field="endDate" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-sky-50/50"><input type="number" class="subtask-edit-input text-xs text-right w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.plannedCost || ''}" data-field="plannedCost" data-task="${index}" data-subtask="${stIndex}" min="0"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50/50"><input type="number" class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.actualManDays || ''}" data-field="actualManDays" data-task="${index}" data-subtask="${stIndex}" min="0" step="0.5"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50/50"><input type="date" class="subtask-edit-input text-xs w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.actualStartDate || ''}" data-field="actualStartDate" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50/50"><input type="date" class="subtask-edit-input text-xs w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.actualEndDate || ''}" data-field="actualEndDate" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell bg-amber-50/50"><input type="number" class="subtask-edit-input text-xs text-right w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.actualCost || ''}" data-field="actualCost" data-task="${index}" data-subtask="${stIndex}" min="0"></td>
+                                <td class="px-1 py-1 border-r border-slate-100 editable-cell"><input type="number" class="subtask-edit-input text-xs text-center w-full px-1 py-0.5 border border-slate-200 rounded" value="${subtask.progress || 0}" data-field="progress" data-task="${index}" data-subtask="${stIndex}" min="0" max="100"></td>
+                                <td class="px-2 py-1 text-center border-r border-slate-100 text-xs ${stDelayClass}">${stDelayText}</td>
+                                <td class="px-1 py-1 editable-cell">
+                                    <div class="flex items-center gap-1">
+                                        <input type="text" class="subtask-edit-input text-xs flex-1 px-1 py-0.5 border border-slate-200 rounded" value="${subtask.note || ''}" data-field="note" data-task="${index}" data-subtask="${stIndex}">
+                                        <button type="button" class="text-red-400 hover:text-red-600 px-1" onclick="removeSubtask(${index}, ${stIndex})">
+                                            <i class="fas fa-times text-xs"></i>
+                                        </button>
+                                    </div>
+                                </td>
+                            `;
+                            subtaskRow.querySelectorAll('.subtask-edit-input').forEach(input => {
+                                input.addEventListener('change', (e) => {
+                                    const taskIdx = parseInt(e.target.dataset.task);
+                                    const subtaskIdx = parseInt(e.target.dataset.subtask);
+                                    const field = e.target.dataset.field;
+                                    updateSubtask(taskIdx, subtaskIdx, field, e.target.value);
+
+                                    // 日付フィールドが編集されたらハイライトとボタン表示
+                                    if (field === 'startDate' || field === 'endDate') {
+                                        onDateEdited(taskIdx, subtaskIdx);
+                                    }
+                                });
+                            });
+                        } else {
+                            subtaskRow.innerHTML = `
+                                <td class="px-2 py-1 text-center border-r border-slate-100"><input type="checkbox" class="subtask-checkbox rounded border-slate-300" data-task="${index}" data-subtask="${stIndex}"></td>
+                                <td class="px-2 py-1 text-center border-r border-slate-100"></td>
+                                <td class="px-2 py-1 text-center text-xs text-slate-400 border-r border-slate-100">${index + 1}-${stIndex + 1}</td>
+                                <td class="px-2 py-1 text-xs text-slate-400 border-r border-slate-100"></td>
+                                <td class="px-2 py-1 text-xs text-slate-600 border-r border-slate-100">
+                                    <div class="flex items-center">
+                                        <i class="fas fa-level-up-alt fa-rotate-90 text-slate-300 mr-2 text-xs"></i>
+                                        ${subtask.name}
+                                    </div>
+                                </td>
+                                <td class="px-2 py-1 text-xs text-slate-500 text-center border-r border-slate-100">${subtask.assignee || '-'}</td>
+                                <td class="px-2 py-1 text-center border-r border-slate-100"><span class="status-badge ${stStatusClass}" style="font-size: 10px; padding: 1px 6px;">${subtask.status}</span></td>
+                                <td class="px-2 py-1 text-xs text-sky-600 text-center border-r border-slate-100 bg-sky-50/50">${subtask.salesManDays ? subtask.salesManDays + '日' : '-'}</td>
+                                <td class="px-2 py-1 text-xs text-sky-600 text-center border-r border-slate-100 bg-sky-50/50">${subtask.manDays ? subtask.manDays + '日' : '-'}</td>
+                                <td class="px-2 py-1 text-xs text-sky-600 text-center border-r border-slate-100 bg-sky-50/50">${formatDate(subtask.startDate)}</td>
+                                <td class="px-2 py-1 text-xs text-sky-600 text-center border-r border-slate-100 bg-sky-50/50">${formatDate(subtask.endDate)}</td>
+                                <td class="px-2 py-1 text-xs text-sky-600 text-right border-r border-slate-100 bg-sky-50/50">${formatCost(subtask.plannedCost)}</td>
+                                <td class="px-2 py-1 text-xs text-amber-600 text-center border-r border-slate-100 bg-amber-50/50">${subtask.actualManDays ? subtask.actualManDays + '日' : '-'}</td>
+                                <td class="px-2 py-1 text-xs text-amber-600 text-center border-r border-slate-100 bg-amber-50/50">${formatDate(subtask.actualStartDate)}</td>
+                                <td class="px-2 py-1 text-xs text-amber-600 text-center border-r border-slate-100 bg-amber-50/50">${formatDate(subtask.actualEndDate)}</td>
+                                <td class="px-2 py-1 text-xs text-amber-600 text-right border-r border-slate-100 bg-amber-50/50">${formatCost(subtask.actualCost)}</td>
+                                <td class="px-2 py-1 text-center border-r border-slate-100"><span class="text-xs ${subtask.progress === 100 ? 'text-emerald-600' : subtask.progress > 0 ? 'text-blue-600' : 'text-slate-400'}">${subtask.progress}%</span></td>
+                                <td class="px-2 py-1 text-xs text-center border-r border-slate-100 ${stDelayClass}">${stDelayText}</td>
+                                <td class="px-2 py-1 text-xs text-slate-400">${subtask.note || '-'}</td>
+                            `;
+                        }
+                        // サブタスク行には専用の右クリックメニューを表示
+                        subtaskRow.addEventListener('contextmenu', (e) => {
+                            e.preventDefault();
+                            selectedRowIndex = index;
+                            selectedSubtaskIndex = stIndex;
+                            showSubtaskContextMenu(e.pageX, e.pageY);
+                        });
+                        tbody.appendChild(subtaskRow);
+                    });
+                }
+            });
+            updateCounts();
+            updateUndoButton();
+        }
+
+        function formatDate(dateStr) {
+            if (!dateStr) return '-';
+            const date = new Date(dateStr);
+            return `${date.getMonth() + 1}/${date.getDate()}`;
+        }
+
+        function updateCounts() {
+            document.getElementById('total-count').textContent = tasks.length + '件';
+            document.getElementById('completed-count').textContent = tasks.filter(t => t.status === '完了').length + '件';
+            document.getElementById('progress-count').textContent = tasks.filter(t => t.status === '進行中').length + '件';
+            document.getElementById('notstarted-count').textContent = tasks.filter(t => t.status === '未着手').length + '件';
+            document.getElementById('delayed-count').textContent = tasks.filter(t => t.delay > 0 && t.status !== '完了').length + '件';
+        }
+
+        function switchViewMode(mode) {
+            const btnView = document.getElementById('btn-view-mode');
+            const btnEdit = document.getElementById('btn-edit-mode');
+            const editActions = document.getElementById('edit-actions');
+            const viewActions = document.getElementById('view-actions');
+            const tableContainer = document.getElementById('table-container');
+
+            if (mode === 'edit') {
+                isEditMode = true;
+                originalTasks = JSON.parse(JSON.stringify(tasks));
+                undoHistory = [];
+                btnView.className = 'px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50';
+                btnEdit.className = 'px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600';
+                editActions.classList.remove('hidden');
+                viewActions.classList.add('hidden');
+                tableContainer.classList.add('edit-mode');
+            } else {
+                isEditMode = false;
+                btnView.className = 'px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600';
+                btnEdit.className = 'px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50';
+                editActions.classList.add('hidden');
+                viewActions.classList.remove('hidden');
+                tableContainer.classList.remove('edit-mode');
+                // 選択バーを非表示
+                clearSelection();
+            }
+            renderTable();
+        }
+
+        function cancelEdit() {
+            if (confirm('編集内容を破棄しますか？')) {
+                tasks = JSON.parse(JSON.stringify(originalTasks));
+                switchViewMode('view');
+            }
+        }
+
+        function saveAllTasks() {
+            console.log('保存データ:', tasks);
+            // 保存時にハイライトをクリア
+            clearDateEditState();
+            alert('タスクを一括登録しました。');
+            switchViewMode('view');
+        }
+
+        function handlePaste(event) {
+            event.preventDefault();
+            const clipboardData = event.clipboardData || window.clipboardData;
+            const pastedData = clipboardData.getData('text');
+            if (!pastedData) return;
+
+            saveToHistory();
+            const rows = pastedData.trim().split('\n');
+            const newTasks = [];
+
+            rows.forEach((row, index) => {
+                const cols = row.includes('\t') ? row.split('\t') : row.split(',');
+                if (cols.length >= 2) {
+                    newTasks.push({
+                        id: tasks.length + index + 1,
+                        process: cols[0]?.trim() || '',
+                        screen: '',
+                        name: cols[1]?.trim() || '',
+                        assignee: cols[2]?.trim() || '',
+                        status: cols[3]?.trim() || '未着手',
+                        salesManDays: parseFloat(cols[4]) || 0,
+                        manDays: parseFloat(cols[5]) || 0,
+                        startDate: cols[6]?.trim() || '',
+                        endDate: cols[7]?.trim() || '',
+                        plannedCost: parseFloat(cols[8]) || 0,
+                        actualManDays: parseFloat(cols[9]) || '',
+                        actualStartDate: cols[10]?.trim() || '',
+                        actualEndDate: cols[11]?.trim() || '',
+                        actualCost: parseFloat(cols[12]) || 0,
+                        progress: parseInt(cols[13]) || 0,
+                        delay: 0,
+                        note: cols[14]?.trim() || ''
+                    });
+                }
+            });
+
+            if (newTasks.length > 0) {
+                tasks = tasks.concat(newTasks);
+                renderTable();
+                alert(newTasks.length + '件のタスクを追加しました。');
+            }
+        }
+
+        function addNewRow() {
+            saveToHistory();
+            tasks.push({ id: tasks.length + 1, process: '', screen: '', name: '', assignee: '', status: '未着手', salesManDays: 0, manDays: 0, startDate: '', endDate: '', plannedCost: 0, actualManDays: '', actualStartDate: '', actualEndDate: '', actualCost: 0, progress: 0, delay: 0, note: '' });
+            renderTable();
+            document.getElementById('table-container').scrollTop = document.getElementById('table-container').scrollHeight;
+        }
+
+        function clearAllData() {
+            if (confirm('すべてのタスクをクリアしますか？')) {
+                saveToHistory();
+                tasks = [];
+                renderTable();
+            }
+        }
+
+        const contextMenu = document.getElementById('context-menu');
+        function showContextMenu(x, y) {
+            // 画面下部に近い場合は上に表示
+            const menuHeight = 350;
+            const windowHeight = window.innerHeight;
+            if (y + menuHeight > windowHeight) {
+                contextMenu.style.top = (y - menuHeight) + 'px';
+            } else {
+                contextMenu.style.top = y + 'px';
+            }
+            contextMenu.style.left = x + 'px';
+            contextMenu.classList.add('show');
+        }
+        document.addEventListener('click', () => {
+            contextMenu.classList.remove('show');
+            document.getElementById('subtask-context-menu').classList.remove('show');
+        });
+
+        // 新しい空行のテンプレート
+        function createEmptyTask() {
+            return {
+                id: Math.max(...tasks.map(t => t.id), 0) + 1,
+                process: '',
+                screen: '',
+                name: '',
+                assignee: '',
+                status: '未着手',
+                salesManDays: 0,
+                manDays: 0,
+                startDate: '',
+                endDate: '',
+                plannedCost: 0,
+                actualManDays: '',
+                actualStartDate: '',
+                actualEndDate: '',
+                actualCost: 0,
+                progress: 0,
+                delay: 0,
+                note: ''
+            };
+        }
+
+        // 上に行追加
+        function addRowAbove() {
+            contextMenu.classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const newTask = createEmptyTask();
+            const insertIndex = selectedRowIndex !== null ? selectedRowIndex : 0;
+            tasks.splice(insertIndex, 0, newTask);
+            renderTable();
+        }
+
+        // 下に行追加
+        function addRowBelow() {
+            contextMenu.classList.remove('show');
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            const newTask = createEmptyTask();
+            const insertIndex = selectedRowIndex !== null ? selectedRowIndex + 1 : tasks.length;
+            tasks.splice(insertIndex, 0, newTask);
+            renderTable();
+        }
+
+        // 新規行追加（末尾）
+        function addNewRow() {
+            if (!isEditMode) {
+                switchViewMode('edit');
+            }
+            saveToHistory();
+            tasks.push(createEmptyTask());
+            renderTable();
+            // 最下部にスクロール
+            const container = document.getElementById('table-container');
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function deleteTask() {
+            if (selectedRowIndex !== null) {
+                saveToHistory();
+                tasks.splice(selectedRowIndex, 1);
+                renderTable();
+            }
+            contextMenu.classList.remove('show');
+        }
+
+        // コピーして上に追加
+        function copyTaskAbove() {
+            if (selectedRowIndex !== null) {
+                saveToHistory();
+                const copied = { ...tasks[selectedRowIndex], id: Math.max(...tasks.map(t => t.id)) + 1 };
+                tasks.splice(selectedRowIndex, 0, copied);
+                renderTable();
+            }
+            contextMenu.classList.remove('show');
+        }
+
+        // コピーして下に追加
+        function copyTaskBelow() {
+            if (selectedRowIndex !== null) {
+                saveToHistory();
+                const copied = { ...tasks[selectedRowIndex], id: Math.max(...tasks.map(t => t.id)) + 1 };
+                tasks.splice(selectedRowIndex + 1, 0, copied);
+                renderTable();
+            }
+            contextMenu.classList.remove('show');
+        }
+
+        // チェックされた行のインデックスを取得
+        function getCheckedRowIndexes() {
+            const checkboxes = document.querySelectorAll('.row-checkbox:checked');
+            const indexes = [];
+            checkboxes.forEach(cb => {
+                const row = cb.closest('tr');
+                if (row && row.dataset.index !== undefined) {
+                    indexes.push(parseInt(row.dataset.index));
+                }
+            });
+            return indexes.sort((a, b) => a - b);
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeBulkEditModal();
+                closeImportModal();
+                closeExportModal();
+                contextMenu.classList.remove('show');
+            }
+
+            // Ctrl+Z: 元に戻す（常に動作）
+            if (e.ctrlKey && e.key === 'z') {
+                if (!e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) {
+                    e.preventDefault();
+                    undoChanges();
+                }
+            }
+
+            // Ctrl+C: チェックされた行をコピー
+            if (e.ctrlKey && e.key === 'c') {
+                if (!e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) {
+                    const checkedIndexes = getCheckedRowIndexes();
+                    if (checkedIndexes.length > 0) {
+                        e.preventDefault();
+                        copiedTasks = checkedIndexes.map(idx => ({ ...tasks[idx] }));
+                        const clipboardStatus = document.getElementById('clipboard-status');
+                        if (clipboardStatus) {
+                            clipboardStatus.querySelector('span').innerHTML = `<i class="fas fa-clipboard-check mr-1"></i>${copiedTasks.length}行をコピーしました（Ctrl+Vで貼り付け）`;
+                            clipboardStatus.classList.remove('hidden');
+                            setTimeout(() => { clipboardStatus.classList.add('hidden'); }, 3000);
+                        }
+                    }
+                }
+            }
+
+            // Ctrl+V: コピーした行を末尾に追加
+            if (e.ctrlKey && e.key === 'v' && copiedTasks.length > 0) {
+                if (!e.target.closest('input') && !e.target.closest('textarea') && !e.target.closest('select')) {
+                    e.preventDefault();
+                    if (!isEditMode) {
+                        switchViewMode('edit');
+                    }
+                    saveToHistory();
+                    copiedTasks.forEach(task => {
+                        const newId = Math.max(...tasks.map(t => t.id)) + 1;
+                        // 深いコピー（サブタスクも含める）
+                        const newTask = JSON.parse(JSON.stringify(task));
+                        newTask.id = newId;
+                        // サブタスクIDも再割り当て
+                        if (newTask.subtasks && newTask.subtasks.length > 0) {
+                            newTask.subtasks = newTask.subtasks.map((st, stIdx) => ({
+                                ...st,
+                                id: 's' + newId + '-' + (stIdx + 1)
+                            }));
+                        }
+                        tasks.push(newTask);
+                    });
+                    renderTable();
+                    // 最下部にスクロール
+                    const container = document.getElementById('table-container');
+                    container.scrollTop = container.scrollHeight;
+                    // ステータス表示
+                    const clipboardStatus = document.getElementById('clipboard-status');
+                    if (clipboardStatus) {
+                        clipboardStatus.querySelector('span').innerHTML = `<i class="fas fa-check mr-1"></i>${copiedTasks.length}行を追加しました`;
+                        clipboardStatus.classList.remove('hidden');
+                        setTimeout(() => { clipboardStatus.classList.add('hidden'); }, 2000);
+                    }
+                }
+            }
+
+            // Delete: チェックされた行を削除（編集モードのみ）
+            // チェックボックス、または入力フィールド以外からの操作を許可
+            if (e.key === 'Delete' && isEditMode) {
+                const isInEditableField = e.target.closest('input:not([type="checkbox"])') ||
+                                          e.target.closest('textarea') ||
+                                          e.target.closest('select');
+                if (!isInEditableField) {
+                    const checkedIndexes = getCheckedRowIndexes();
+                    if (checkedIndexes.length > 0) {
+                        e.preventDefault();
+                        saveToHistory();
+                        // 後ろから削除（インデックスがずれないように）
+                        checkedIndexes.sort((a, b) => b - a).forEach(idx => {
+                            tasks.splice(idx, 1);
+                        });
+                        renderTable();
+                        clearSelection();
+                    }
+                }
+            }
+
+            // Enter: チェックされた行を一括編集（編集モードのみ）
+            // チェックボックス、または入力フィールド以外からの操作を許可
+            if (e.key === 'Enter' && isEditMode) {
+                const isInEditableField = e.target.closest('input:not([type="checkbox"])') ||
+                                          e.target.closest('textarea') ||
+                                          e.target.closest('select');
+                if (!isInEditableField) {
+                    const checkedIndexes = getCheckedRowIndexes();
+                    if (checkedIndexes.length > 0) {
+                        e.preventDefault();
+                        openBulkEditModal();
+                    }
+                }
+            }
+        });
+
+        // CSV/Excelペースト処理
+        document.addEventListener('paste', (e) => {
+            // 入力フィールド内でのペーストは通常動作
+            if (e.target.closest('input') || e.target.closest('textarea') || e.target.closest('select')) {
+                return;
+            }
+
+            const clipboardData = e.clipboardData || window.clipboardData;
+            const pastedText = clipboardData.getData('text');
+
+            if (!pastedText || pastedText.trim() === '') return;
+
+            // タブまたはカンマ区切りかチェック
+            const lines = pastedText.trim().split('\n');
+            if (lines.length === 0) return;
+
+            // 区切り文字を判定（タブ優先）
+            const delimiter = lines[0].includes('\t') ? '\t' : ',';
+            const firstLineCols = lines[0].split(delimiter).length;
+
+            // 2列以上ある場合はCSV/Excelデータとして処理
+            if (firstLineCols >= 2) {
+                e.preventDefault();
+
+                if (!isEditMode) {
+                    switchViewMode('edit');
+                }
+                saveToHistory();
+
+                const newTasks = [];
+                let currentTask = null;
+
+                lines.forEach(line => {
+                    if (line.trim() === '') return;
+                    const cols = line.split(delimiter).map(c => c.trim().replace(/^["']|["']$/g, ''));
+
+                    // 階層列対応（エクスポート形式と同じ）
+                    const hierarchy = cols[0] || '';
+                    const process = cols[1] || '';
+                    let name = cols[2] || '';
+                    const assignee = cols[3] || '';
+                    const status = cols[4] || '未着手';
+                    const salesManDays = parseFloat(cols[5]) || 0;
+                    const manDays = parseFloat(cols[6]) || 0;
+                    const startDate = cols[7] || '';
+                    const endDate = cols[8] || '';
+                    const plannedCost = parseFloat(cols[9]) || 0;
+                    const actualManDays = cols[10] ? parseFloat(cols[10]) : '';
+                    const actualStartDate = cols[11] || '';
+                    const actualEndDate = cols[12] || '';
+                    const actualCost = parseFloat(cols[13]) || 0;
+                    const progress = parseInt(cols[14]) || 0;
+                    const delay = parseInt(cols[15]) || 0;
+                    const note = cols[16] || '';
+
+                    if (hierarchy === '親' || (hierarchy !== 'サブ' && process)) {
+                        // 親タスク
+                        const taskId = Math.max(...tasks.map(t => t.id), 0) + newTasks.length + 1;
+                        currentTask = {
+                            id: taskId,
+                            process,
+                            screen: '',
+                            name,
+                            assignee,
+                            status,
+                            salesManDays,
+                            manDays,
+                            startDate,
+                            endDate,
+                            plannedCost,
+                            actualManDays,
+                            actualStartDate,
+                            actualEndDate,
+                            actualCost,
+                            progress,
+                            delay,
+                            note,
+                            subtasks: []
+                        };
+                        newTasks.push(currentTask);
+                    } else if (hierarchy === 'サブ' && currentTask) {
+                        // サブタスク（└ を除去）
+                        name = name.replace(/^[\s　]*└[\s　]*/, '').trim();
+                        const stIdx = currentTask.subtasks.length;
+                        currentTask.subtasks.push({
+                            id: 's' + currentTask.id + '-' + (stIdx + 1),
+                            name,
+                            assignee,
+                            status,
+                            salesManDays,
+                            manDays,
+                            startDate,
+                            endDate,
+                            plannedCost,
+                            actualManDays,
+                            actualStartDate,
+                            actualEndDate,
+                            actualCost,
+                            progress,
+                            delay,
+                            note
+                        });
+                    }
+                });
+
+                if (newTasks.length > 0) {
+                    tasks.push(...newTasks);
+                    renderTable();
+
+                    // 最下部にスクロール
+                    const container = document.getElementById('table-container');
+                    container.scrollTop = container.scrollHeight;
+
+                    // ステータス表示
+                    const clipboardStatus = document.getElementById('clipboard-status');
+                    if (clipboardStatus) {
+                        clipboardStatus.querySelector('span').innerHTML = `<i class="fas fa-paste mr-1"></i>${newTasks.length}行を貼り付けました`;
+                        clipboardStatus.classList.remove('hidden');
+                        setTimeout(() => { clipboardStatus.classList.add('hidden'); }, 3000);
+                    }
+                }
+            }
+        });
+
+        // サイドバーモーダル
+        function openSidebarModal() {
+            document.getElementById('sidebar-modal').classList.add('show');
+            document.getElementById('sidebar-modal-overlay').classList.add('show');
+        }
+        function closeSidebarModal() {
+            document.getElementById('sidebar-modal').classList.remove('show');
+            document.getElementById('sidebar-modal-overlay').classList.remove('show');
+        }
+
+        // ユーザーメニュー
+        const userMenuTrigger = document.getElementById('user-menu-trigger');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        userMenuTrigger.addEventListener('click', (e) => { e.stopPropagation(); userMenuDropdown.classList.toggle('show'); document.getElementById('user-menu-arrow').style.transform = userMenuDropdown.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0deg)'; });
+        document.addEventListener('click', (e) => { if (!userMenuTrigger.contains(e.target) && !userMenuDropdown.contains(e.target)) { userMenuDropdown.classList.remove('show'); document.getElementById('user-menu-arrow').style.transform = 'rotate(0deg)'; } });
+        function logout() { if (confirm('ログアウトしますか？')) alert('ログアウトしました'); }
+
+        document.getElementById('select-all').addEventListener('change', function() {
+            document.querySelectorAll('.row-checkbox').forEach(cb => { cb.checked = this.checked; });
+            updateSelectionCount();
+        });
+
+        // 選択数更新（編集モード時のみ選択バー表示）
+        function updateSelectionCount() {
+            const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+            const count = checkedBoxes.length;
+            const actionBar = document.getElementById('selection-action-bar');
+            const countEl = document.getElementById('selected-count');
+
+            if (count > 0 && isEditMode) {
+                actionBar.classList.remove('hidden');
+                countEl.textContent = count;
+            } else {
+                actionBar.classList.add('hidden');
+            }
+        }
+
+        // 行チェックボックスのイベント委譲
+        document.getElementById('task-tbody').addEventListener('change', function(e) {
+            if (e.target.classList.contains('row-checkbox')) {
+                updateSelectionCount();
+                // 全選択チェックボックスの状態更新
+                const allCheckboxes = document.querySelectorAll('.row-checkbox');
+                const checkedBoxes = document.querySelectorAll('.row-checkbox:checked');
+                document.getElementById('select-all').checked = allCheckboxes.length === checkedBoxes.length && allCheckboxes.length > 0;
+            }
+        });
+
+        // 選択解除
+        function clearSelection() {
+            document.getElementById('select-all').checked = false;
+            document.querySelectorAll('.row-checkbox').forEach(cb => { cb.checked = false; });
+            updateSelectionCount();
+        }
+
+        // 選択されたインデックスを取得
+        function getSelectedIndices() {
+            const indices = [];
+            document.querySelectorAll('.row-checkbox').forEach((cb, index) => {
+                if (cb.checked) indices.push(index);
+            });
+            return indices;
+        }
+
+        // 一括編集モーダルを開く
+        function openBulkEditModal() {
+            const selectedIndices = getSelectedIndices();
+            if (selectedIndices.length === 0) {
+                alert('タスクを選択してください。');
+                return;
+            }
+            document.getElementById('bulk-edit-count').textContent = selectedIndices.length;
+            document.getElementById('bulk-assignee').value = '';
+            document.getElementById('bulk-status').value = '';
+            document.getElementById('bulk-progress').value = '';
+            document.getElementById('bulk-process').value = '';
+            document.getElementById('bulk-edit-modal').classList.remove('hidden');
+        }
+
+        // 一括編集モーダルを閉じる
+        function closeBulkEditModal() {
+            document.getElementById('bulk-edit-modal').classList.add('hidden');
+        }
+
+        // 一括編集を適用
+        function applyBulkEdit() {
+            const selectedIndices = getSelectedIndices();
+            if (selectedIndices.length === 0) return;
+
+            const assignee = document.getElementById('bulk-assignee').value;
+            const status = document.getElementById('bulk-status').value;
+            const progress = document.getElementById('bulk-progress').value;
+            const process = document.getElementById('bulk-process').value;
+
+            if (!assignee && !status && !progress && !process) {
+                alert('変更する項目を1つ以上選択してください。');
+                return;
+            }
+
+            saveToHistory();
+
+            selectedIndices.forEach(index => {
+                if (assignee) tasks[index].assignee = assignee;
+                if (status) tasks[index].status = status;
+                if (progress !== '') tasks[index].progress = parseInt(progress);
+                if (process) tasks[index].process = process;
+            });
+
+            renderTable();
+            closeBulkEditModal();
+            clearSelection();
+            alert(selectedIndices.length + '件のタスクを更新しました。');
+        }
+
+        // 一括削除
+        function bulkDelete() {
+            const selectedIndices = getSelectedIndices();
+            if (selectedIndices.length === 0) {
+                return;
+            }
+
+            saveToHistory();
+
+            // 後ろから削除（インデックスがずれないように）
+            selectedIndices.sort((a, b) => b - a).forEach(index => {
+                tasks.splice(index, 1);
+            });
+
+            renderTable();
+            clearSelection();
+        }
+
+        // CSVファイルインポート
+        function handleFileImport(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const rows = content.trim().split('\n');
+
+                // ヘッダー行をスキップ（1行目がヘッダーと仮定）
+                const dataRows = rows.slice(1);
+
+                if (dataRows.length === 0) {
+                    alert('インポートするデータがありません。');
+                    return;
+                }
+
+                saveToHistory();
+                const newTasks = [];
+
+                dataRows.forEach((row, index) => {
+                    const cols = row.includes('\t') ? row.split('\t') : row.split(',');
+                    // 空行をスキップ
+                    if (cols.length < 2 || !cols[0].trim()) return;
+
+                    newTasks.push({
+                        id: tasks.length + index + 1,
+                        process: cols[0]?.trim() || '',
+                        screen: '',
+                        name: cols[1]?.trim() || '',
+                        assignee: cols[2]?.trim() || '',
+                        status: cols[3]?.trim() || '未着手',
+                        salesManDays: parseFloat(cols[4]) || 0,
+                        manDays: parseFloat(cols[5]) || 0,
+                        startDate: cols[6]?.trim() || '',
+                        endDate: cols[7]?.trim() || '',
+                        plannedCost: parseFloat(cols[8]) || 0,
+                        actualManDays: parseFloat(cols[9]) || '',
+                        actualStartDate: cols[10]?.trim() || '',
+                        actualEndDate: cols[11]?.trim() || '',
+                        actualCost: parseFloat(cols[12]) || 0,
+                        progress: parseInt(cols[13]) || 0,
+                        delay: 0,
+                        note: cols[14]?.trim() || ''
+                    });
+                });
+
+                if (newTasks.length > 0) {
+                    tasks = tasks.concat(newTasks);
+                    renderTable();
+                    alert(newTasks.length + '件のタスクをインポートしました。');
+                } else {
+                    alert('インポート可能なデータがありませんでした。');
+                }
+
+                // ファイル入力をリセット
+                event.target.value = '';
+            };
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        // テンプレートダウンロード
+        function downloadTemplate() {
+            const headers = ['工程', 'タスク名', '担当者', 'ステータス', '営業工数', '工数', '開始日', '終了日', '原価', '実工数', '実開始', '実終了', '出来高', '進捗', '遅延', '備考'];
+            const sampleData = [
+                ['設計', '画面設計', '山田', '未着手', '0.5', '2', '2024-04-01', '2024-04-05', '200000', '', '', '', '', '0', '0', ''],
+                ['開発', 'フロント実装', '佐藤', '未着手', '0', '3', '2024-04-06', '2024-04-10', '300000', '', '', '', '', '0', '0', ''],
+            ];
+
+            const csvContent = [headers.join(','), ...sampleData.map(row => row.join(','))].join('\n');
+            const bom = '\uFEFF'; // UTF-8 BOM
+            const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'task_template.csv';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }
+
+        // 編集ボタンでモーダルを開く機能を追加
+        function openEditModalForRow(index) {
+            selectedRowIndex = index;
+            openTaskModal('edit');
+        }
+
+        // ESCキーで一括編集モーダルも閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeBulkEditModal();
+                closeImportModal();
+                closeExportModal();
+            }
+        });
+
+        // ========================================
+        // 絞り込み機能
+        // ========================================
+        let isFiltered = false;
+        originalTasks = [...tasks]; // フィルター用のオリジナルデータを初期化
+
+        function toggleFilterPanel() {
+            const panel = document.getElementById('filter-panel');
+            const btn = document.getElementById('filter-btn');
+            if (panel.classList.contains('hidden')) {
+                panel.classList.remove('hidden');
+                btn.classList.add('bg-blue-50', 'border-blue-400', 'text-blue-700');
+                btn.classList.remove('border-slate-300', 'text-slate-700');
+            } else {
+                panel.classList.add('hidden');
+                btn.classList.remove('bg-blue-50', 'border-blue-400', 'text-blue-700');
+                btn.classList.add('border-slate-300', 'text-slate-700');
+            }
+        }
+
+        function applyFilter() {
+            const process = document.getElementById('filter-process').value;
+            const assignee = document.getElementById('filter-assignee').value;
+            const status = document.getElementById('filter-status').value;
+            const progress = document.getElementById('filter-progress').value;
+            const delay = document.getElementById('filter-delay').value;
+
+            // 予定
+            const salesMin = parseFloat(document.getElementById('filter-sales-min').value);
+            const salesMax = parseFloat(document.getElementById('filter-sales-max').value);
+            const mandaysMin = parseFloat(document.getElementById('filter-mandays-min').value);
+            const mandaysMax = parseFloat(document.getElementById('filter-mandays-max').value);
+            const startFrom = document.getElementById('filter-start-from').value;
+            const startTo = document.getElementById('filter-start-to').value;
+            const endFrom = document.getElementById('filter-end-from').value;
+            const endTo = document.getElementById('filter-end-to').value;
+            const costMin = parseFloat(document.getElementById('filter-cost-min').value);
+            const costMax = parseFloat(document.getElementById('filter-cost-max').value);
+
+            // 実績
+            const actualMandaysMin = parseFloat(document.getElementById('filter-actual-mandays-min').value);
+            const actualMandaysMax = parseFloat(document.getElementById('filter-actual-mandays-max').value);
+            const actualStartFrom = document.getElementById('filter-actual-start-from').value;
+            const actualStartTo = document.getElementById('filter-actual-start-to').value;
+            const actualEndFrom = document.getElementById('filter-actual-end-from').value;
+            const actualEndTo = document.getElementById('filter-actual-end-to').value;
+            const actualCostMin = parseFloat(document.getElementById('filter-actual-cost-min').value);
+            const actualCostMax = parseFloat(document.getElementById('filter-actual-cost-max').value);
+
+            if (!isFiltered) {
+                originalTasks = [...tasks];
+            }
+
+            let filtered = [...originalTasks];
+
+            if (process) {
+                filtered = filtered.filter(t => t.process === process);
+            }
+            if (assignee) {
+                filtered = filtered.filter(t => t.assignee === assignee);
+            }
+            if (status) {
+                filtered = filtered.filter(t => t.status === status);
+            }
+            if (progress) {
+                if (progress === '0') {
+                    filtered = filtered.filter(t => t.progress === 0);
+                } else if (progress === '1-99') {
+                    filtered = filtered.filter(t => t.progress > 0 && t.progress < 100);
+                } else if (progress === '100') {
+                    filtered = filtered.filter(t => t.progress === 100);
+                }
+            }
+            if (delay) {
+                if (delay === 'delayed') {
+                    filtered = filtered.filter(t => t.delay > 0);
+                } else if (delay === 'ontime') {
+                    filtered = filtered.filter(t => t.delay <= 0);
+                }
+            }
+
+            // 予定フィルタ
+            if (!isNaN(salesMin)) filtered = filtered.filter(t => (t.salesManDays || 0) >= salesMin);
+            if (!isNaN(salesMax)) filtered = filtered.filter(t => (t.salesManDays || 0) <= salesMax);
+            if (!isNaN(mandaysMin)) filtered = filtered.filter(t => (t.manDays || 0) >= mandaysMin);
+            if (!isNaN(mandaysMax)) filtered = filtered.filter(t => (t.manDays || 0) <= mandaysMax);
+            if (startFrom) filtered = filtered.filter(t => t.startDate && t.startDate >= startFrom);
+            if (startTo) filtered = filtered.filter(t => t.startDate && t.startDate <= startTo);
+            if (endFrom) filtered = filtered.filter(t => t.endDate && t.endDate >= endFrom);
+            if (endTo) filtered = filtered.filter(t => t.endDate && t.endDate <= endTo);
+            if (!isNaN(costMin)) filtered = filtered.filter(t => (t.plannedCost || 0) >= costMin);
+            if (!isNaN(costMax)) filtered = filtered.filter(t => (t.plannedCost || 0) <= costMax);
+
+            // 実績フィルタ
+            if (!isNaN(actualMandaysMin)) filtered = filtered.filter(t => (parseFloat(t.actualManDays) || 0) >= actualMandaysMin);
+            if (!isNaN(actualMandaysMax)) filtered = filtered.filter(t => (parseFloat(t.actualManDays) || 0) <= actualMandaysMax);
+            if (actualStartFrom) filtered = filtered.filter(t => t.actualStartDate && t.actualStartDate >= actualStartFrom);
+            if (actualStartTo) filtered = filtered.filter(t => t.actualStartDate && t.actualStartDate <= actualStartTo);
+            if (actualEndFrom) filtered = filtered.filter(t => t.actualEndDate && t.actualEndDate >= actualEndFrom);
+            if (actualEndTo) filtered = filtered.filter(t => t.actualEndDate && t.actualEndDate <= actualEndTo);
+            if (!isNaN(actualCostMin)) filtered = filtered.filter(t => (t.actualCost || 0) >= actualCostMin);
+            if (!isNaN(actualCostMax)) filtered = filtered.filter(t => (t.actualCost || 0) <= actualCostMax);
+
+            tasks = filtered;
+            isFiltered = true;
+            renderTable();
+        }
+
+        function clearFilter() {
+            document.getElementById('filter-process').value = '';
+            document.getElementById('filter-assignee').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-progress').value = '';
+            document.getElementById('filter-delay').value = '';
+
+            // 予定
+            document.getElementById('filter-sales-min').value = '';
+            document.getElementById('filter-sales-max').value = '';
+            document.getElementById('filter-mandays-min').value = '';
+            document.getElementById('filter-mandays-max').value = '';
+            document.getElementById('filter-start-from').value = '';
+            document.getElementById('filter-start-to').value = '';
+            document.getElementById('filter-end-from').value = '';
+            document.getElementById('filter-end-to').value = '';
+            document.getElementById('filter-cost-min').value = '';
+            document.getElementById('filter-cost-max').value = '';
+
+            // 実績
+            document.getElementById('filter-actual-mandays-min').value = '';
+            document.getElementById('filter-actual-mandays-max').value = '';
+            document.getElementById('filter-actual-start-from').value = '';
+            document.getElementById('filter-actual-start-to').value = '';
+            document.getElementById('filter-actual-end-from').value = '';
+            document.getElementById('filter-actual-end-to').value = '';
+            document.getElementById('filter-actual-cost-min').value = '';
+            document.getElementById('filter-actual-cost-max').value = '';
+
+            if (isFiltered) {
+                tasks = [...originalTasks];
+                isFiltered = false;
+                renderTable();
+            }
+        }
+
+        // ========================================
+        // インポート機能
+        // ========================================
+        let importData = [];
+
+        function openImportModal() {
+            document.getElementById('import-modal').classList.remove('hidden');
+            document.getElementById('import-preview').classList.add('hidden');
+            document.getElementById('import-execute-btn').disabled = true;
+            importData = [];
+        }
+
+        function closeImportModal() {
+            document.getElementById('import-modal').classList.add('hidden');
+        }
+
+        function handleImportFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const content = e.target.result;
+                const rows = content.trim().split('\n');
+
+                // ヘッダー行をスキップ
+                const headers = rows[0].includes('\t') ? rows[0].split('\t') : rows[0].split(',');
+                const dataRows = rows.slice(1);
+
+                if (dataRows.length === 0) {
+                    alert('インポートするデータがありません。');
+                    return;
+                }
+
+                // プレビュー表示
+                const headerRow = document.getElementById('import-preview-header');
+                headerRow.innerHTML = headers.map(h => `<th class="px-2 py-1 border-r border-slate-200 text-left text-xs">${h.trim()}</th>`).join('');
+
+                const tbody = document.getElementById('import-preview-body');
+                tbody.innerHTML = '';
+                importData = [];
+
+                dataRows.slice(0, 10).forEach(row => {
+                    const cols = row.includes('\t') ? row.split('\t') : row.split(',');
+                    const tr = document.createElement('tr');
+                    tr.className = 'border-b border-slate-100';
+                    tr.innerHTML = cols.map(c => `<td class="px-2 py-1 border-r border-slate-100 text-xs">${c.trim()}</td>`).join('');
+                    tbody.appendChild(tr);
+                });
+
+                // 階層列対応のインポートデータ構築
+                let currentTask = null;
+                dataRows.forEach(row => {
+                    const cols = row.includes('\t') ? row.split('\t') : row.split(',');
+                    if (cols.length < 3) return;
+
+                    const hierarchy = cols[0]?.trim() || '';
+                    const process = cols[1]?.trim() || '';
+                    let name = cols[2]?.trim() || '';
+                    const assignee = cols[3]?.trim() || '';
+                    const status = cols[4]?.trim() || '未着手';
+                    const salesManDays = parseFloat(cols[5]) || 0;
+                    const manDays = parseFloat(cols[6]) || 0;
+                    const startDate = cols[7]?.trim() || '';
+                    const endDate = cols[8]?.trim() || '';
+                    const plannedCost = parseFloat(cols[9]) || 0;
+                    const actualManDays = parseFloat(cols[10]) || '';
+                    const actualStartDate = cols[11]?.trim() || '';
+                    const actualEndDate = cols[12]?.trim() || '';
+                    const actualCost = parseFloat(cols[13]) || 0;
+                    const progress = parseInt(cols[14]) || 0;
+                    const delay = parseInt(cols[15]) || 0;
+                    const note = cols[16]?.trim() || '';
+
+                    if (hierarchy === '親' || (hierarchy !== 'サブ' && process)) {
+                        // 親タスク
+                        currentTask = {
+                            process,
+                            screen: '',
+                            name,
+                            assignee,
+                            status,
+                            salesManDays,
+                            manDays,
+                            startDate,
+                            endDate,
+                            plannedCost,
+                            actualManDays,
+                            actualStartDate,
+                            actualEndDate,
+                            actualCost,
+                            progress,
+                            delay,
+                            note,
+                            subtasks: []
+                        };
+                        importData.push(currentTask);
+                    } else if (hierarchy === 'サブ' && currentTask) {
+                        // サブタスク（└ を除去）
+                        name = name.replace(/^[\s　]*└[\s　]*/, '').trim();
+                        currentTask.subtasks.push({
+                            id: 'new-' + Date.now() + '-' + Math.random(),
+                            name,
+                            assignee,
+                            status,
+                            salesManDays,
+                            manDays,
+                            startDate,
+                            endDate,
+                            plannedCost,
+                            actualManDays,
+                            actualStartDate,
+                            actualEndDate,
+                            actualCost,
+                            progress,
+                            delay,
+                            note
+                        });
+                    }
+                });
+
+                document.getElementById('import-row-count').textContent = importData.length + '件（親タスク）';
+                document.getElementById('import-preview').classList.remove('hidden');
+                document.getElementById('import-execute-btn').disabled = importData.length === 0;
+            };
+            reader.readAsText(file, 'UTF-8');
+            event.target.value = '';
+        }
+
+        function executeImport() {
+            if (importData.length === 0) {
+                alert('インポートするデータがありません。');
+                return;
+            }
+
+            const maxId = Math.max(...tasks.map(t => t.id), 0);
+            const newTasks = importData.map((data, index) => {
+                const taskId = maxId + index + 1;
+                // サブタスクIDを再割り当て
+                if (data.subtasks && data.subtasks.length > 0) {
+                    data.subtasks = data.subtasks.map((st, stIdx) => ({
+                        ...st,
+                        id: 's' + taskId + '-' + (stIdx + 1)
+                    }));
+                }
+                return {
+                    id: taskId,
+                    ...data
+                };
+            });
+
+            tasks = tasks.concat(newTasks);
+            if (!isFiltered) {
+                originalTasks = [...tasks];
+            }
+            renderTable();
+            closeImportModal();
+            alert(newTasks.length + '件のタスクをインポートしました。');
+        }
+
+        // ========================================
+        // エクスポート機能
+        // ========================================
+        function openExportModal() {
+            document.getElementById('export-modal').classList.remove('hidden');
+            const checkedIndexes = getCheckedRowIndexes();
+            const exportCount = checkedIndexes.length > 0 ? checkedIndexes.length : tasks.length;
+            document.getElementById('export-count').textContent = exportCount + (checkedIndexes.length > 0 ? '（選択中）' : '');
+        }
+
+        function closeExportModal() {
+            document.getElementById('export-modal').classList.add('hidden');
+        }
+
+        function executeExport() {
+            const format = document.querySelector('input[name="export-format"]:checked').value;
+
+            // 選択された行があればその行のみ、なければ全件
+            const checkedIndexes = getCheckedRowIndexes();
+            const exportTasks = checkedIndexes.length > 0
+                ? checkedIndexes.map(idx => tasks[idx])
+                : tasks;
+
+            if (exportTasks.length === 0) {
+                alert('エクスポートするデータがありません。');
+                return;
+            }
+
+            const headers = ['階層', '工程', 'タスク名', '担当者', 'ステータス', '営業工数', '工数', '開始日', '終了日', '原価', '実工数', '実開始', '実終了', '出来高', '進捗', '遅延', '備考'];
+            const dataRows = [];
+
+            exportTasks.forEach((task, taskIdx) => {
+                // 親タスク行
+                dataRows.push([
+                    '親',
+                    task.process || '',
+                    task.name || '',
+                    task.assignee || '',
+                    task.status || '',
+                    task.salesManDays || '',
+                    task.manDays || '',
+                    task.startDate || '',
+                    task.endDate || '',
+                    task.plannedCost || '',
+                    task.actualManDays || '',
+                    task.actualStartDate || '',
+                    task.actualEndDate || '',
+                    task.actualCost || '',
+                    task.progress || 0,
+                    task.delay || 0,
+                    task.note || ''
+                ]);
+
+                // サブタスク行
+                if (task.subtasks && task.subtasks.length > 0) {
+                    task.subtasks.forEach((subtask, stIdx) => {
+                        dataRows.push([
+                            'サブ',
+                            '', // 工程（空欄）
+                            '　└ ' + (subtask.name || ''), // インデント付きタスク名
+                            subtask.assignee || '',
+                            subtask.status || '',
+                            subtask.salesManDays || '',
+                            subtask.manDays || '',
+                            subtask.startDate || '',
+                            subtask.endDate || '',
+                            subtask.plannedCost || '',
+                            subtask.actualManDays || '',
+                            subtask.actualStartDate || '',
+                            subtask.actualEndDate || '',
+                            subtask.actualCost || '',
+                            subtask.progress || 0,
+                            subtask.delay || 0,
+                            subtask.note || ''
+                        ]);
+                    });
+                }
+            });
+
+            const now = new Date();
+            const dateStr = now.getFullYear() +
+                ('0' + (now.getMonth() + 1)).slice(-2) +
+                ('0' + now.getDate()).slice(-2) + '_' +
+                ('0' + now.getHours()).slice(-2) +
+                ('0' + now.getMinutes()).slice(-2);
+
+            if (format === 'excel') {
+                // Excel形式 (.xlsx) - SheetJSを使用
+                const wsData = [headers, ...dataRows];
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+                // 列幅を設定
+                ws['!cols'] = [
+                    { wch: 6 },  // 階層
+                    { wch: 10 }, // 工程
+                    { wch: 30 }, // タスク名
+                    { wch: 10 }, // 担当者
+                    { wch: 10 }, // ステータス
+                    { wch: 10 }, // 営業工数
+                    { wch: 8 },  // 工数
+                    { wch: 12 }, // 開始日
+                    { wch: 12 }, // 終了日
+                    { wch: 12 }, // 原価
+                    { wch: 8 },  // 実工数
+                    { wch: 12 }, // 実開始
+                    { wch: 12 }, // 実終了
+                    { wch: 12 }, // 出来高
+                    { wch: 8 },  // 進捗
+                    { wch: 8 },  // 遅延
+                    { wch: 20 }, // 備考
+                ];
+
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'タスク一覧');
+                XLSX.writeFile(wb, 'tasks_export_' + dateStr + '.xlsx');
+            } else {
+                // CSV形式
+                const rows = dataRows.map(row => row.map(val => {
+                    const str = String(val);
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return '"' + str.replace(/"/g, '""') + '"';
+                    }
+                    return str;
+                }).join(','));
+
+                const csvContent = [headers.join(','), ...rows].join('\n');
+                const bom = '\uFEFF';
+                const blob = new Blob([bom + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = 'tasks_export_' + dateStr + '.csv';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            }
+
+            closeExportModal();
+            alert(exportTasks.length + '件のデータをエクスポートしました。');
+        }
+
+        // ========================================
+        // 一括日付更新機能
+        // ========================================
+
+        // 工程の順序マップ
+        const processOrder = {
+            '要件定義': 1,
+            '設計': 2,
+            '開発': 3,
+            'テスト': 4,
+            'リリース': 5
+        };
+
+        // 日付編集時の処理
+        function onDateEdited(taskIndex, subtaskIndex) {
+            // 編集されたタスクを記録
+            dateEditedTaskIndex = taskIndex;
+            dateEditedSubtaskIndex = subtaskIndex;
+
+            // ハイライト表示
+            dateEditedRows.add(`task-${taskIndex}`);
+            if (subtaskIndex !== null) {
+                dateEditedRows.add(`subtask-${taskIndex}-${subtaskIndex}`);
+            }
+            applyDateEditHighlight();
+
+            // 一括更新ボタンを表示
+            document.getElementById('bulk-date-btn').classList.remove('hidden');
+        }
+
+        // ハイライトを適用
+        function applyDateEditHighlight() {
+            document.querySelectorAll('.task-row').forEach(row => {
+                const idx = row.dataset.index;
+                if (dateEditedRows.has(`task-${idx}`)) {
+                    row.classList.add('date-edited');
+                } else {
+                    row.classList.remove('date-edited');
+                }
+            });
+            document.querySelectorAll('.subtask-row').forEach(row => {
+                const taskIdx = row.dataset.parentIndex;
+                const subtaskIdx = row.dataset.subtaskIndex;
+                if (dateEditedRows.has(`subtask-${taskIdx}-${subtaskIdx}`)) {
+                    row.classList.add('date-edited');
+                } else {
+                    row.classList.remove('date-edited');
+                }
+            });
+        }
+
+        // ハイライトとボタンをリセット
+        function clearDateEditState() {
+            dateEditedTaskIndex = null;
+            dateEditedSubtaskIndex = null;
+            dateEditedRows.clear();
+            document.querySelectorAll('.date-edited').forEach(el => el.classList.remove('date-edited'));
+            document.getElementById('bulk-date-btn').classList.add('hidden');
+        }
+
+        function openBulkDateModal() {
+            const modal = document.getElementById('bulk-date-modal');
+            modal.classList.remove('hidden');
+
+            // 開始タスクを表示（編集したタスク）
+            if (dateEditedTaskIndex !== null) {
+                const task = tasks[dateEditedTaskIndex];
+                let displayText = `${dateEditedTaskIndex + 1}. ${task.name}`;
+                if (dateEditedSubtaskIndex !== null) {
+                    const subtask = task.subtasks[dateEditedSubtaskIndex];
+                    displayText += ` > ${subtask.name}`;
+                }
+                displayText += ` (${task.startDate || '未設定'} 〜 ${task.endDate || '未設定'})`;
+                document.getElementById('bulk-start-task-display').textContent = displayText;
+                document.getElementById('bulk-start-task').value = dateEditedTaskIndex;
+            } else {
+                document.getElementById('bulk-start-task-display').textContent = '-';
+                document.getElementById('bulk-start-task').value = '';
+            }
+
+            // 終了タスクのプルダウンを生成
+            populateEndTaskSelect();
+
+            // プレビューを非表示に
+            document.getElementById('bulk-date-preview').classList.add('hidden');
+        }
+
+        function closeBulkDateModal() {
+            document.getElementById('bulk-date-modal').classList.add('hidden');
+        }
+
+        // 終了タスク選択モーダルを開く
+        function startEndTaskSelection() {
+            // 一括日付モーダルを閉じる
+            document.getElementById('bulk-date-modal').classList.add('hidden');
+
+            // 終了タスク選択モーダルを開く
+            const modal = document.getElementById('end-task-select-modal');
+            modal.classList.remove('hidden');
+
+            // タスク一覧を生成
+            renderEndTaskSelectList();
+        }
+
+        // 終了タスク選択モーダルを閉じる
+        function closeEndTaskSelectModal() {
+            document.getElementById('end-task-select-modal').classList.add('hidden');
+            document.getElementById('bulk-date-modal').classList.remove('hidden');
+        }
+
+        // 終了タスク選択一覧を生成
+        function renderEndTaskSelectList() {
+            const tbody = document.getElementById('end-task-select-tbody');
+            tbody.innerHTML = '';
+
+            // 開始タスクの情報を取得
+            const startTaskIndex = dateEditedTaskIndex;
+            const startSubtaskIndex = dateEditedSubtaskIndex;
+
+            tasks.forEach((task, index) => {
+                let statusClass = 'text-slate-500';
+                if (task.status === '進行中') statusClass = 'text-blue-600';
+                else if (task.status === '完了') statusClass = 'text-emerald-600';
+
+                // 開始タスクかどうかを判定
+                const isStartTask = (startTaskIndex === index && startSubtaskIndex === null);
+                const highlightClass = isStartTask ? 'bg-amber-100' : '';
+
+                const row = document.createElement('tr');
+                row.className = `end-task-select-row border-b border-slate-100 ${highlightClass}`;
+                row.innerHTML = `
+                    <td class="px-3 py-2 text-slate-600">${index + 1}</td>
+                    <td class="px-3 py-2 text-slate-600">${task.process || '-'}</td>
+                    <td class="px-3 py-2 font-medium text-slate-800">
+                        ${isStartTask ? '<i class="fas fa-play text-amber-500 mr-1"></i>' : ''}${task.name}
+                    </td>
+                    <td class="px-3 py-2 text-slate-600">${task.assignee || '-'}</td>
+                    <td class="px-3 py-2 ${statusClass}">${task.status}</td>
+                `;
+                row.addEventListener('click', () => selectEndTask(index, null));
+                tbody.appendChild(row);
+
+                // サブタスクも表示
+                if (task.subtasks && task.subtasks.length > 0) {
+                    task.subtasks.forEach((subtask, subIndex) => {
+                        let subStatusClass = 'text-slate-500';
+                        if (subtask.status === '進行中') subStatusClass = 'text-blue-600';
+                        else if (subtask.status === '完了') subStatusClass = 'text-emerald-600';
+
+                        // 開始サブタスクかどうかを判定
+                        const isStartSubtask = (startTaskIndex === index && startSubtaskIndex === subIndex);
+                        const subHighlightClass = isStartSubtask ? 'bg-amber-100' : '';
+
+                        const subRow = document.createElement('tr');
+                        subRow.className = `end-task-select-row border-b border-slate-50 bg-slate-50 ${subHighlightClass}`;
+                        subRow.innerHTML = `
+                            <td class="px-3 py-2 text-slate-400 text-sm">${index + 1}-${subIndex + 1}</td>
+                            <td class="px-3 py-2 text-slate-500 text-sm">${subtask.process || '-'}</td>
+                            <td class="px-3 py-2 text-slate-700 text-sm pl-6">
+                                <i class="fas fa-level-up-alt fa-rotate-90 text-slate-300 mr-1"></i>
+                                ${isStartSubtask ? '<i class="fas fa-play text-amber-500 mr-1"></i>' : ''}${subtask.name}
+                            </td>
+                            <td class="px-3 py-2 text-slate-500 text-sm">${subtask.assignee || '-'}</td>
+                            <td class="px-3 py-2 text-sm ${subStatusClass}">${subtask.status}</td>
+                        `;
+                        subRow.addEventListener('click', () => selectEndTask(index, subIndex));
+                        tbody.appendChild(subRow);
+                    });
+                }
+            });
+        }
+
+        // 終了タスク選択完了
+        function selectEndTask(taskIndex, subtaskIndex) {
+            selectedEndTaskIndex = taskIndex;
+            selectedEndSubtaskIndex = subtaskIndex;
+            const task = tasks[taskIndex];
+
+            let displayText = '';
+            if (subtaskIndex !== null) {
+                const subtask = task.subtasks[subtaskIndex];
+                displayText = `${taskIndex + 1}-${subtaskIndex + 1}. ${task.name} > ${subtask.name} (${subtask.assignee || '未割当'})`;
+                document.getElementById('bulk-end-task').value = `${taskIndex}-${subtaskIndex}`;
+            } else {
+                displayText = `${taskIndex + 1}. ${task.name} (${task.assignee || '未割当'})`;
+                document.getElementById('bulk-end-task').value = taskIndex;
+            }
+            document.getElementById('bulk-end-task-display').textContent = displayText;
+
+            // モーダル切り替え
+            document.getElementById('end-task-select-modal').classList.add('hidden');
+            document.getElementById('bulk-date-modal').classList.remove('hidden');
+        }
+
+        // 終了タスク選択クリア
+        function clearEndTaskSelection() {
+            selectedEndTaskIndex = null;
+            selectedEndSubtaskIndex = null;
+            document.getElementById('bulk-end-task').value = '';
+            document.getElementById('bulk-end-task-display').textContent = '指定なし（最後まで）';
+        }
+
+        // 営業日を計算（土日を除外）
+        function addBusinessDays(startDate, days, excludeWeekends) {
+            const date = new Date(startDate);
+            let addedDays = 0;
+
+            while (addedDays < days) {
+                date.setDate(date.getDate() + 1);
+                if (!excludeWeekends || (date.getDay() !== 0 && date.getDay() !== 6)) {
+                    addedDays++;
+                }
+            }
+
+            return date;
+        }
+
+        // 開始日が営業日でなければ次の営業日に調整
+        function adjustToBusinessDay(date, excludeWeekends) {
+            const d = new Date(date);
+            if (excludeWeekends) {
+                while (d.getDay() === 0 || d.getDay() === 6) {
+                    d.setDate(d.getDate() + 1);
+                }
+            }
+            return d;
+        }
+
+        // 工数から終了日を計算（工数1=1日、開始日=終了日）
+        function calculateEndDate(startDate, manDays, excludeWeekends) {
+            if (!manDays || manDays <= 0) {
+                return startDate;
+            }
+            // 工数1日なら開始日=終了日、工数2日なら開始日+1=終了日
+            const daysToAdd = Math.ceil(manDays) - 1;
+            if (daysToAdd <= 0) {
+                return startDate;
+            }
+            return addBusinessDays(startDate, daysToAdd, excludeWeekends);
+        }
+
+        // 日付を文字列に変換
+        function formatDateString(date) {
+            const d = new Date(date);
+            const year = d.getFullYear();
+            const month = ('0' + (d.getMonth() + 1)).slice(-2);
+            const day = ('0' + d.getDate()).slice(-2);
+            return `${year}-${month}-${day}`;
+        }
+
+        // 対象タスクを取得（範囲指定・完了除外）
+        function getTargetTasks() {
+            const startIdx = document.getElementById('bulk-start-task').value;
+            const endIdx = document.getElementById('bulk-end-task').value;
+
+            let targetTasks = [];
+            const start = startIdx === '' ? 0 : parseInt(startIdx);
+            const end = endIdx === '' ? tasks.length - 1 : parseInt(endIdx);
+
+            for (let i = start; i <= end && i < tasks.length; i++) {
+                const task = tasks[i];
+                // 完了タスクは除外
+                if (task.status === '完了') continue;
+
+                targetTasks.push({
+                    originalIndex: i,
+                    task: task
+                });
+            }
+
+            return targetTasks;
+        }
+
+        // タスクをソート（メンバー → 工程 → タスク順）
+        function sortTasksForScheduling(targetTasks) {
+            return targetTasks.sort((a, b) => {
+                // 1. 担当者でソート
+                const assigneeA = a.task.assignee || '';
+                const assigneeB = b.task.assignee || '';
+                if (assigneeA !== assigneeB) {
+                    return assigneeA.localeCompare(assigneeB, 'ja');
+                }
+
+                // 2. 工程でソート
+                const processA = processOrder[a.task.process] || 99;
+                const processB = processOrder[b.task.process] || 99;
+                if (processA !== processB) {
+                    return processA - processB;
+                }
+
+                // 3. 元の順序を維持
+                return a.originalIndex - b.originalIndex;
+            });
+        }
+
+        // サブタスクをソート（メンバー → 工程順）
+        function sortSubtasksForScheduling(subtasks) {
+            return [...subtasks].sort((a, b) => {
+                // 1. 担当者でソート
+                const assigneeA = a.assignee || '';
+                const assigneeB = b.assignee || '';
+                if (assigneeA !== assigneeB) {
+                    return assigneeA.localeCompare(assigneeB, 'ja');
+                }
+                // 元の順序を維持
+                return 0;
+            });
+        }
+
+        function previewBulkDate() {
+            // 開始タスクの日付を取得
+            const startTaskIdx = document.getElementById('bulk-start-task').value;
+            if (startTaskIdx === '') {
+                alert('日付を編集したタスクがありません。');
+                return;
+            }
+
+            const startTask = tasks[parseInt(startTaskIdx)];
+            const baseDate = startTask.startDate;
+            if (!baseDate) {
+                alert('開始タスクの開始日が設定されていません。');
+                return;
+            }
+
+            const targetTasks = getTargetTasks();
+            if (targetTasks.length === 0) {
+                alert('対象となるタスクがありません（完了タスクは除外されます）。');
+                return;
+            }
+
+            const sortedTasks = sortTasksForScheduling(targetTasks);
+
+            let previewHtml = `<p class="mb-2">対象: ${sortedTasks.length}件のタスク（メンバー→工程→タスク順）</p>`;
+            previewHtml += `<p class="mb-2 text-amber-700">基準日: ${baseDate}</p>`;
+            previewHtml += '<ul class="space-y-1">';
+
+            let currentAssignee = null;
+            sortedTasks.forEach(item => {
+                const isNewAssignee = item.task.assignee !== currentAssignee;
+                if (isNewAssignee) {
+                    currentAssignee = item.task.assignee;
+                    previewHtml += `<li class="font-medium text-blue-700 mt-2">【${currentAssignee || '未割当'}】</li>`;
+                }
+                previewHtml += `<li class="ml-4">・${item.task.name} (工数: ${item.task.manDays || 0}日)</li>`;
+
+                // サブタスクも表示
+                if (item.task.subtasks && item.task.subtasks.length > 0) {
+                    const nonCompletedSubtasks = item.task.subtasks.filter(st => st.status !== '完了');
+                    if (nonCompletedSubtasks.length > 0) {
+                        const sortedSubtasks = sortSubtasksForScheduling(nonCompletedSubtasks);
+                        sortedSubtasks.forEach(st => {
+                            previewHtml += `<li class="ml-8 text-slate-500">└ ${st.name} (${st.assignee || '未割当'}, 工数: ${st.manDays || 0}日)</li>`;
+                        });
+                    }
+                }
+            });
+
+            previewHtml += '</ul>';
+
+            document.getElementById('bulk-date-preview-content').innerHTML = previewHtml;
+            document.getElementById('bulk-date-preview').classList.remove('hidden');
+        }
+
+        function executeBulkDateUpdate() {
+            // 開始タスクの日付を取得
+            const startTaskIdx = document.getElementById('bulk-start-task').value;
+            if (startTaskIdx === '') {
+                alert('日付を編集したタスクがありません。');
+                return;
+            }
+
+            const startTask = tasks[parseInt(startTaskIdx)];
+            const baseDate = startTask.startDate;
+            if (!baseDate) {
+                alert('開始タスクの開始日が設定されていません。');
+                return;
+            }
+
+            const excludeWeekends = document.getElementById('bulk-exclude-weekends').checked;
+            const targetTasks = getTargetTasks();
+
+            if (targetTasks.length === 0) {
+                alert('対象となるタスクがありません（完了タスクは除外されます）。');
+                return;
+            }
+
+            saveToHistory();
+
+            const sortedTasks = sortTasksForScheduling(targetTasks);
+
+            // メンバーごとの現在の日付を管理
+            let memberCurrentDate = {};
+            const baseDateObj = adjustToBusinessDay(new Date(baseDate), excludeWeekends);
+
+            sortedTasks.forEach(item => {
+                const task = tasks[item.originalIndex];
+                const assignee = task.assignee || '_unassigned_';
+
+                // メンバーが変わったら基準日にリセット
+                if (!memberCurrentDate[assignee]) {
+                    memberCurrentDate[assignee] = new Date(baseDateObj);
+                }
+
+                let currentDate = memberCurrentDate[assignee];
+                currentDate = adjustToBusinessDay(currentDate, excludeWeekends);
+
+                // サブタスクがある場合
+                if (task.subtasks && task.subtasks.length > 0) {
+                    const nonCompletedSubtasks = task.subtasks.filter(st => st.status !== '完了');
+
+                    if (nonCompletedSubtasks.length > 0) {
+                        // 親タスクの開始日を設定
+                        task.startDate = formatDateString(currentDate);
+
+                        // サブタスク用のメンバーごとの日付管理
+                        let subtaskMemberDate = {};
+                        let maxEndDate = currentDate;
+
+                        const sortedSubtasks = sortSubtasksForScheduling(nonCompletedSubtasks);
+
+                        sortedSubtasks.forEach(subtask => {
+                            const stAssignee = subtask.assignee || '_unassigned_';
+
+                            // サブタスクのメンバーが変わったら親タスク開始日にリセット
+                            if (!subtaskMemberDate[stAssignee]) {
+                                subtaskMemberDate[stAssignee] = new Date(currentDate);
+                            }
+
+                            let stCurrentDate = subtaskMemberDate[stAssignee];
+                            stCurrentDate = adjustToBusinessDay(stCurrentDate, excludeWeekends);
+
+                            // サブタスクの開始日・終了日を設定
+                            subtask.startDate = formatDateString(stCurrentDate);
+                            const stEndDate = calculateEndDate(stCurrentDate, subtask.manDays, excludeWeekends);
+                            subtask.endDate = formatDateString(stEndDate);
+
+                            // 次のサブタスク用に日付を更新
+                            const nextDate = new Date(stEndDate);
+                            nextDate.setDate(nextDate.getDate() + 1);
+                            subtaskMemberDate[stAssignee] = nextDate;
+
+                            // 最大終了日を更新
+                            if (stEndDate > maxEndDate) {
+                                maxEndDate = stEndDate;
+                            }
+                        });
+
+                        // 親タスクの終了日をサブタスクの最終日に合わせる
+                        task.endDate = formatDateString(maxEndDate);
+
+                        // 次のタスク用に日付を更新
+                        const nextDate = new Date(maxEndDate);
+                        nextDate.setDate(nextDate.getDate() + 1);
+                        memberCurrentDate[assignee] = nextDate;
+
+                    } else {
+                        // 完了していないサブタスクがない場合は親タスクの工数で計算
+                        task.startDate = formatDateString(currentDate);
+                        const endDate = calculateEndDate(currentDate, task.manDays, excludeWeekends);
+                        task.endDate = formatDateString(endDate);
+
+                        const nextDate = new Date(endDate);
+                        nextDate.setDate(nextDate.getDate() + 1);
+                        memberCurrentDate[assignee] = nextDate;
+                    }
+                } else {
+                    // サブタスクがない場合
+                    task.startDate = formatDateString(currentDate);
+                    const endDate = calculateEndDate(currentDate, task.manDays, excludeWeekends);
+                    task.endDate = formatDateString(endDate);
+
+                    const nextDate = new Date(endDate);
+                    nextDate.setDate(nextDate.getDate() + 1);
+                    memberCurrentDate[assignee] = nextDate;
+                }
+            });
+
+            // 一括更新したタスクをハイライト対象に追加
+            sortedTasks.forEach(item => {
+                dateEditedRows.add(`task-${item.originalIndex}`);
+                // サブタスクもハイライト対象に追加
+                const task = tasks[item.originalIndex];
+                if (task.subtasks && task.subtasks.length > 0) {
+                    task.subtasks.forEach((st, stIdx) => {
+                        if (st.status !== '完了') {
+                            dateEditedRows.add(`subtask-${item.originalIndex}-${stIdx}`);
+                        }
+                    });
+                }
+            });
+
+            renderTable();
+            closeBulkDateModal();
+            // ハイライトと一括更新ボタンは維持する（clearDateEditStateを呼ばない）
+            // 一括更新後もハイライトを適用
+            applyDateEditHighlight();
+            alert(`${sortedTasks.length}件のタスクの日付を更新しました。保存ボタンで確定してください。`);
+        }
+
+        // ドラッグ&ドロップ対応
+        const dropZone = document.getElementById('import-drop-zone');
+        if (dropZone) {
+            dropZone.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                dropZone.classList.add('border-emerald-400', 'bg-emerald-50');
+            });
+            dropZone.addEventListener('dragleave', () => {
+                dropZone.classList.remove('border-emerald-400', 'bg-emerald-50');
+            });
+            dropZone.addEventListener('drop', (e) => {
+                e.preventDefault();
+                dropZone.classList.remove('border-emerald-400', 'bg-emerald-50');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleImportFile({ target: { files: files, value: '' } });
+                }
+            });
+        }
+
+        // プロジェクト横断モード
+        let isAllProjectMode = false;
+
+        // プロジェクト変更
+        function onProjectChange(value) {
+            isAllProjectMode = value === 'all';
+            console.log('プロジェクト変更:', value, isAllProjectMode ? '(全プロジェクトモード)' : '');
+            renderTable();
+        }
+
+        // タスク検索
+        function searchTasks(keyword) {
+            if (!keyword) {
+                renderTable();
+                return;
+            }
+            const filtered = tasks.filter(t =>
+                t.name.includes(keyword) ||
+                t.process.includes(keyword) ||
+                (t.screen && t.screen.includes(keyword)) ||
+                (t.assignee && t.assignee.includes(keyword)) ||
+                (t.note && t.note.includes(keyword))
+            );
+            const tbody = document.getElementById('task-tbody');
+            tbody.innerHTML = '';
+            filtered.forEach((task, displayIndex) => {
+                const originalIndex = tasks.findIndex(t => t.id === task.id);
+                renderSingleRow(task, originalIndex, displayIndex + 1);
+            });
+            updateCounts();
+        }
+
+        function renderSingleRow(task, index, displayNo) {
+            const tbody = document.getElementById('task-tbody');
+            const row = document.createElement('tr');
+            row.className = 'task-row border-b border-slate-100 hover:bg-slate-50 transition-colors';
+            row.dataset.index = index;
+
+            let statusClass = 'status-not-started';
+            if (task.status === '進行中') statusClass = 'status-in-progress';
+            else if (task.status === '完了') statusClass = 'status-completed';
+            if (task.delay > 0 && task.status !== '完了') statusClass = 'status-delayed';
+
+            let delayText = '-';
+            let delayClass = 'text-slate-400';
+            if (task.delay > 0) { delayText = task.delay + '日遅れ'; delayClass = 'text-rose-600 font-semibold'; }
+            else if (task.delay < 0) { delayText = Math.abs(task.delay) + '日先行'; delayClass = 'text-emerald-600 font-semibold'; }
+
+            row.innerHTML = `
+                <td class="px-2 py-2 text-center border-r border-slate-100"><input type="checkbox" class="row-checkbox rounded border-slate-300"></td>
+                <td class="px-2 py-2 text-center border-r border-slate-100">
+                    <i class="fas fa-grip-vertical text-slate-300 text-xs"></i>
+                </td>
+                <td class="px-2 py-2 text-center text-xs text-slate-500 border-r border-slate-100">${displayNo}</td>
+                <td class="px-2 py-2 text-xs text-slate-700 border-r border-slate-100">${task.process}</td>
+                <td class="px-2 py-2 text-xs text-slate-600 border-r border-slate-100">${task.screen || '-'}</td>
+                <td class="px-2 py-2 text-xs text-slate-800 font-medium border-r border-slate-100">${task.name}</td>
+                <td class="px-2 py-2 text-xs text-slate-600 text-center border-r border-slate-100">${task.assignee || '-'}</td>
+                <td class="px-2 py-2 text-center border-r border-slate-100"><span class="status-badge ${statusClass}">${task.status}</span></td>
+                <td class="px-2 py-2 text-xs text-slate-600 text-center border-r border-slate-100 bg-slate-50">${task.manDays}日</td>
+                <td class="px-2 py-2 text-xs text-slate-600 text-center border-r border-slate-100 bg-slate-50">${formatDate(task.startDate)}</td>
+                <td class="px-2 py-2 text-xs text-slate-600 text-center border-r border-slate-100 bg-slate-50">${formatDate(task.endDate)}</td>
+                <td class="px-2 py-2 text-xs text-slate-600 text-right border-r border-slate-100 bg-slate-50">${formatCost(task.plannedCost)}</td>
+                <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${task.actualManDays ? task.actualManDays + '日' : '-'}</td>
+                <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${formatDate(task.actualStartDate)}</td>
+                <td class="px-2 py-2 text-xs text-amber-700 text-center border-r border-slate-100 bg-amber-50">${formatDate(task.actualEndDate)}</td>
+                <td class="px-2 py-2 text-xs text-amber-700 text-right border-r border-slate-100 bg-amber-50">${formatCost(task.actualCost)}</td>
+                <td class="px-2 py-2 text-center border-r border-slate-100"><span class="text-xs font-semibold ${task.progress === 100 ? 'text-emerald-600' : task.progress > 0 ? 'text-blue-600' : 'text-slate-400'}">${task.progress}%</span></td>
+                <td class="px-2 py-2 text-xs text-center border-r border-slate-100 ${delayClass}">${delayText}</td>
+                <td class="px-2 py-2 text-xs text-slate-500 border-r border-slate-100">${task.note || '-'}</td>
+                <td class="px-2 py-2 text-center">
+                    <button onclick="openEditModalForRow(${index})" class="text-blue-500 hover:text-blue-700 text-xs"><i class="fas fa-edit"></i></button>
+                </td>
+            `;
+
+            row.addEventListener('contextmenu', (e) => { e.preventDefault(); selectedRowIndex = index; showContextMenu(e.pageX, e.pageY); });
+            row.addEventListener('dblclick', () => { selectedRowIndex = index; openTaskModal('edit'); });
+            row.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('row-checkbox') && !e.target.closest('button')) {
+                    selectedRowIndex = index;
+                    document.querySelectorAll('.task-row').forEach(r => r.classList.remove('selected'));
+                    row.classList.add('selected');
+                }
+            });
+            tbody.appendChild(row);
+        }
+
+        // 初期化
+        renderTable();
+    </script>
+    <!-- 新機能用外部スクリプト（旧スクリプトを上書きする場合は上のscriptタグを削除してください） -->
+    <!-- <script src="task-list.js"></script> -->
+</body>
+</html>

@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>週次レポート - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* モーダル */
+        .modal-overlay {
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+        }
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+        .modal-content {
+            animation: modalFadeIn 0.3s ease-out;
+        }
+
+        /* ユーザーメニュー */
+        .user-menu-container {
+            position: relative;
+        }
+        .user-menu-trigger {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-menu-trigger:hover {
+            background: #f8fafc;
+        }
+        .user-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            z-index: 9999;
+            min-width: 240px;
+            padding: 0;
+            display: none;
+            overflow: hidden;
+        }
+        .user-menu-dropdown.show {
+            display: block;
+            animation: fadeInDown 0.2s ease;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-menu-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .user-menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #475569;
+            font-size: 14px;
+        }
+        .user-menu-item:hover {
+            background: #f8fafc;
+        }
+        .user-menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            color: #94a3b8;
+        }
+        .user-menu-item.logout {
+            color: #dc2626;
+            border-top: 1px solid #e2e8f0;
+        }
+        .user-menu-item.logout i {
+            color: #dc2626;
+        }
+        .user-menu-item.logout:hover {
+            background: #fef2f2;
+        }
+
+        /* レポートカード */
+        .report-card {
+            transition: all 0.2s ease;
+        }
+        .report-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        }
+
+        /* ステータスバッジ */
+        .status-draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-submitted {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .status-approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* タスク情報テーブル */
+        .task-info-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .task-info-table td {
+            font-size: 13px;
+        }
+
+        /* Markdown プレビュー */
+        .markdown-preview h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+        .markdown-preview h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+        .markdown-preview h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
+        .markdown-preview p { margin: 0.5rem 0; }
+        .markdown-preview ul { list-style: disc; margin-left: 1.5rem; }
+        .markdown-preview ol { list-style: decimal; margin-left: 1.5rem; }
+        .markdown-preview li { margin: 0.25rem 0; }
+        .markdown-preview code { background: #f1f5f9; padding: 0.125rem 0.25rem; border-radius: 4px; font-size: 0.875rem; }
+        .markdown-preview pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+        .markdown-preview pre code { background: transparent; padding: 0; }
+        .markdown-preview blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 0.5rem 0; color: #64748b; }
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }
+        .markdown-preview th { background: #f8fafc; }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <!-- サイドバーモーダル -->
+    <div id="sidebar-overlay" class="sidebar-modal-overlay" onclick="closeSidebar()"></div>
+    <aside id="sidebar-modal" class="sidebar-modal text-white">
+        <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <a href="../dashboard.html" class="flex items-center">
+                <i class="fas fa-project-diagram text-blue-400 mr-3 text-lg"></i>
+                <span class="text-lg font-bold text-white">PM System</span>
+            </a>
+            <button onclick="closeSidebar()" class="p-1.5 hover:bg-slate-700 rounded text-slate-400">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="mt-4">
+            <a href="../dashboard.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-tachometer-alt w-5 mr-3 text-slate-400"></i><span>ダッシュボード</span>
+            </a>
+            <a href="../customers/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-building w-5 mr-3 text-slate-400"></i><span>顧客</span>
+            </a>
+            <a href="../projects/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-folder w-5 mr-3 text-slate-400"></i><span>プロジェクト</span>
+            </a>
+            <a href="../schedule/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-calendar-alt w-5 mr-3 text-slate-400"></i><span>スケジュール</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-users w-5 mr-3 text-slate-400"></i><span>メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center text-slate-300 hover:text-white">
+                <i class="fas fa-yen-sign w-5 mr-3 text-slate-400"></i><span>原価管理</span>
+            </a>
+            <a href="index.html" class="nav-item active flex items-center text-white">
+                <i class="fas fa-chart-bar w-5 mr-3 text-blue-400"></i><span>レポート</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-8 py-3">
+                    <div class="flex items-center space-x-4">
+                        <button onclick="openSidebar()" class="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors">
+                            <i class="fas fa-bars text-lg"></i>
+                        </button>
+                        <a href="../dashboard.html" class="flex items-center space-x-2">
+                            <i class="fas fa-project-diagram text-blue-500 text-lg"></i>
+                            <span class="text-lg font-bold text-slate-800">PM System</span>
+                        </a>
+                        <div class="h-6 w-px bg-slate-300"></div>
+                        <div class="flex items-center space-x-3">
+                            <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-md">
+                                <i class="fas fa-chart-bar text-white text-xs"></i>
+                            </div>
+                            <h2 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">レポート</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700" id="today-date">2024年4月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                                            山
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-user"></i>
+                                    <span>プロフィール</span>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-cog"></i>
+                                    <span>設定</span>
+                                </div>
+                                <div class="user-menu-item logout" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>ログアウト</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- サブヘッダー -->
+            <div class="bg-white border-b border-slate-200 px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <!-- 全プロジェクト対象表示 -->
+                        <div class="flex items-center space-x-2 text-sm text-slate-600 bg-slate-50 px-4 py-2 rounded-lg border border-slate-200">
+                            <i class="fas fa-globe text-emerald-500"></i>
+                            <span class="font-medium">全顧客・全プロジェクト対象</span>
+                        </div>
+
+                        <!-- レポート作成ボタン -->
+                        <a href="edit.html" class="btn-primary px-4 py-2 text-white rounded-lg text-sm font-medium flex items-center">
+                            <i class="fas fa-plus mr-2"></i>新規レポート作成
+                        </a>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm text-slate-500">全 <span class="font-semibold text-slate-700">12</span> 件</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- メインエリア -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- 統計カード -->
+                <div class="grid grid-cols-4 gap-4 mb-6">
+                    <div class="bg-white rounded-xl p-4 card-shadow border border-slate-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">今月のレポート</p>
+                                <p class="text-2xl font-bold text-slate-800 mt-1">4</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <i class="fas fa-file-alt text-blue-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 card-shadow border border-slate-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">下書き</p>
+                                <p class="text-2xl font-bold text-amber-600 mt-1">1</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                                <i class="fas fa-edit text-amber-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 card-shadow border border-slate-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">提出済み</p>
+                                <p class="text-2xl font-bold text-blue-600 mt-1">2</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                                <i class="fas fa-paper-plane text-blue-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-xl p-4 card-shadow border border-slate-100">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-xs text-slate-500 font-medium">承認済み</p>
+                                <p class="text-2xl font-bold text-emerald-600 mt-1">9</p>
+                            </div>
+                            <div class="w-10 h-10 rounded-lg bg-emerald-100 flex items-center justify-center">
+                                <i class="fas fa-check-circle text-emerald-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- レポート一覧 -->
+                <div class="bg-white rounded-xl card-shadow border border-slate-100">
+                    <div class="p-4 border-b border-slate-100">
+                        <h3 class="font-semibold text-slate-800">レポート一覧</h3>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        <!-- 下書きレポート -->
+                        <a href="show.html?status=draft" class="report-card p-4 block cursor-pointer hover:bg-slate-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                                        <i class="fas fa-edit text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-semibold text-slate-800">第15週 週次レポート</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium status-draft">下書き</span>
+                                        </div>
+                                        <div class="text-sm text-slate-500 mt-1">
+                                            <span>2024/04/04（木）〜 2024/04/10（水）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-500">作成日</p>
+                                        <p class="text-sm font-medium text-slate-700">2024/04/10</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-slate-400"></i>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- 提出済みレポート -->
+                        <a href="show.html?status=submitted" class="report-card p-4 block cursor-pointer hover:bg-slate-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                                        <i class="fas fa-paper-plane text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-semibold text-slate-800">第14週 週次レポート</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium status-submitted">提出済み</span>
+                                        </div>
+                                        <div class="text-sm text-slate-500 mt-1">
+                                            <span>2024/03/28（木）〜 2024/04/03（水）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-500">提出日</p>
+                                        <p class="text-sm font-medium text-slate-700">2024/04/04</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-slate-400"></i>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- 承認済みレポート -->
+                        <a href="show.html?status=approved" class="report-card p-4 block cursor-pointer hover:bg-slate-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-semibold text-slate-800">第13週 週次レポート</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium status-approved">承認済み</span>
+                                        </div>
+                                        <div class="text-sm text-slate-500 mt-1">
+                                            <span>2024/03/21（木）〜 2024/03/27（水）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-500">承認日</p>
+                                        <p class="text-sm font-medium text-slate-700">2024/03/29</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-slate-400"></i>
+                                </div>
+                            </div>
+                        </a>
+
+                        <!-- 過去の承認済みレポート -->
+                        <a href="show.html?status=approved" class="report-card p-4 block cursor-pointer hover:bg-slate-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-semibold text-slate-800">第12週 週次レポート</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium status-approved">承認済み</span>
+                                        </div>
+                                        <div class="text-sm text-slate-500 mt-1">
+                                            <span>2024/03/14（木）〜 2024/03/20（水）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-500">承認日</p>
+                                        <p class="text-sm font-medium text-slate-700">2024/03/22</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-slate-400"></i>
+                                </div>
+                            </div>
+                        </a>
+
+                        <a href="show.html?status=approved" class="report-card p-4 block cursor-pointer hover:bg-slate-50">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                                        <i class="fas fa-check-circle text-white text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <div class="flex items-center space-x-2">
+                                            <span class="font-semibold text-slate-800">第11週 週次レポート</span>
+                                            <span class="px-2 py-0.5 rounded-full text-xs font-medium status-approved">承認済み</span>
+                                        </div>
+                                        <div class="text-sm text-slate-500 mt-1">
+                                            <span>2024/03/07（木）〜 2024/03/13（水）</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-4">
+                                    <div class="text-right">
+                                        <p class="text-xs text-slate-500">承認日</p>
+                                        <p class="text-sm font-medium text-slate-700">2024/03/15</p>
+                                    </div>
+                                    <i class="fas fa-chevron-right text-slate-400"></i>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // サイドバーモーダル
+        function openSidebar() {
+            document.getElementById('sidebar-modal').classList.add('show');
+            document.getElementById('sidebar-overlay').classList.add('show');
+        }
+        function closeSidebar() {
+            document.getElementById('sidebar-modal').classList.remove('show');
+            document.getElementById('sidebar-overlay').classList.remove('show');
+        }
+
+        // ユーザーメニュー
+        const userMenuTrigger = document.getElementById('user-menu-trigger');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        const userMenuArrow = document.getElementById('user-menu-arrow');
+
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenuDropdown.classList.toggle('show');
+            userMenuArrow.style.transform = userMenuDropdown.classList.contains('show') ? 'rotate(180deg)' : '';
+        });
+
+        document.addEventListener('click', () => {
+            userMenuDropdown.classList.remove('show');
+            userMenuArrow.style.transform = '';
+        });
+
+        // 今日の日付を設定
+        function setTodayDate() {
+            const today = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('today-date').textContent = today.toLocaleDateString('ja-JP', options);
+        }
+        setTodayDate();
+
+        // 週の開始日（木曜日）と終了日（水曜日）を計算
+        function getWeekRange(date = new Date()) {
+            const d = new Date(date);
+            const day = d.getDay(); // 0=日, 1=月, ..., 4=木, ..., 6=土
+
+            // 木曜日を基準に計算
+            // 木曜日なら0、金曜日なら-1、...、水曜日なら-6
+            let daysToThursday;
+            if (day >= 4) {
+                daysToThursday = day - 4;
+            } else {
+                daysToThursday = day + 3;
+            }
+
+            const startDate = new Date(d);
+            startDate.setDate(d.getDate() - daysToThursday);
+
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+
+            return { startDate, endDate };
+        }
+
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function setThisWeek() {
+            const { startDate, endDate } = getWeekRange();
+            document.getElementById('start-date').value = formatDateForInput(startDate);
+            document.getElementById('end-date').value = formatDateForInput(endDate);
+        }
+
+        // モーダル制御
+        function openCreateModal() {
+            document.getElementById('create-modal').classList.remove('hidden');
+            document.getElementById('create-modal').classList.add('flex');
+            setThisWeek();
+        }
+
+        function closeCreateModal() {
+            document.getElementById('create-modal').classList.add('hidden');
+            document.getElementById('create-modal').classList.remove('flex');
+        }
+
+        // タブ切り替え
+        function switchTab(tab) {
+            const btnEdit = document.getElementById('btn-edit');
+            const btnPreview = document.getElementById('btn-preview');
+            const tabEdit = document.getElementById('tab-edit');
+            const tabPreview = document.getElementById('tab-preview');
+
+            if (tab === 'edit') {
+                btnEdit.className = 'px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors';
+                btnPreview.className = 'px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors';
+                tabEdit.classList.remove('hidden');
+                tabPreview.classList.add('hidden');
+            } else {
+                btnEdit.className = 'px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors';
+                btnPreview.className = 'px-3 py-1.5 bg-blue-500 text-white rounded-lg text-xs font-medium transition-colors';
+                tabEdit.classList.add('hidden');
+                tabPreview.classList.remove('hidden');
+
+                // Markdownをパース
+                const markdown = document.getElementById('markdown-input').value;
+                if (markdown.trim()) {
+                    document.getElementById('markdown-preview').innerHTML = marked.parse(markdown);
+                } else {
+                    document.getElementById('markdown-preview').innerHTML = '<p class="text-slate-400 text-sm">プレビューがここに表示されます</p>';
+                }
+            }
+        }
+
+        // タスク情報をコピー
+        function copyTaskInfo() {
+            const table = document.getElementById('task-info-body');
+            const rows = table.querySelectorAll('tr');
+            let text = 'タスク名\t担当者\t予定開始\t予定終了\t実績開始\t実績終了\t進捗率\tステータス\n';
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const rowData = Array.from(cells).map(cell => cell.textContent.trim()).join('\t');
+                text += rowData + '\n';
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('タスク情報をクリップボードにコピーしました');
+            });
+        }
+
+        // 下書き保存
+        function saveDraft() {
+            alert('下書きを保存しました');
+            closeCreateModal();
+        }
+
+        // レポート提出
+        function submitReport() {
+            if (confirm('レポートを提出してよろしいですか？')) {
+                alert('レポートを提出しました');
+                closeCreateModal();
+            }
+        }
+
+        // PDF出力
+        function exportPDF() {
+            alert('PDF出力機能は実装予定です');
+        }
+
+        // ログアウト
+        function logout() {
+            if (confirm('ログアウトしてよろしいですか？')) {
+                location.href = '../login.html';
+            }
+        }
+
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeCreateModal();
+            }
+        });
+    </script>
+</body>
+</html>

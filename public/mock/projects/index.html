@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>プロジェクト一覧 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        .progress-bar {
+            transition: width 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* ユーザーメニュー */
+        .user-menu-container {
+            position: relative;
+        }
+        .user-menu-trigger {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-menu-trigger:hover {
+            background: #f8fafc;
+        }
+        .user-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            z-index: 9999;
+            min-width: 240px;
+            padding: 0;
+            display: none;
+            overflow: hidden;
+        }
+        .user-menu-dropdown.show {
+            display: block;
+            animation: fadeInDown 0.2s ease;
+        }
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-8px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        .user-menu-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .user-menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #475569;
+            font-size: 14px;
+        }
+        .user-menu-item:hover {
+            background: #f8fafc;
+        }
+        .user-menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            color: #94a3b8;
+        }
+        .user-menu-item.logout {
+            color: #dc2626;
+            border-top: 1px solid #e2e8f0;
+        }
+        .user-menu-item.logout i {
+            color: #dc2626;
+        }
+        .user-menu-item.logout:hover {
+            background: #fef2f2;
+        }
+
+        /* プロジェクトカードホバー */
+        .project-card {
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .project-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+
+        /* 顧客グループ */
+        .customer-group {
+            margin-bottom: 32px;
+        }
+        .customer-header {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-radius: 12px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .customer-header:hover {
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        }
+        .customer-header.collapsed + .customer-projects {
+            display: none;
+        }
+        .customer-toggle {
+            transition: transform 0.2s;
+        }
+        .customer-header.collapsed .customer-toggle {
+            transform: rotate(-90deg);
+        }
+
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <!-- サイドバーモーダルオーバーレイ -->
+    <div class="sidebar-modal-overlay" id="sidebar-overlay"></div>
+
+    <!-- サイドバーモーダル -->
+    <aside class="sidebar-modal" id="sidebar-modal">
+        <div class="p-5 border-b border-slate-700/50">
+            <a href="../dashboard.html" class="flex items-center">
+                <i class="fas fa-project-diagram text-blue-400 mr-3 text-xl"></i>
+                <span class="text-xl font-bold text-white">PM System</span>
+            </a>
+        </div>
+        <nav class="mt-4 px-2">
+            <a href="../dashboard.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-tachometer-alt w-6 mr-3 text-slate-400"></i><span>ダッシュボード</span>
+            </a>
+            <a href="../customers/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-building w-6 mr-3 text-slate-400"></i><span>顧客</span>
+            </a>
+            <a href="index.html" class="nav-item active flex items-center px-4 py-3 text-white">
+                <i class="fas fa-folder w-6 mr-3 text-blue-400"></i><span>プロジェクト</span>
+            </a>
+            <a href="../schedule/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-calendar-alt w-6 mr-3 text-slate-400"></i><span>スケジュール</span>
+            </a>
+            <a href="../tasks/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-tasks w-6 mr-3 text-slate-400"></i><span>タスク一覧</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-users w-6 mr-3 text-slate-400"></i><span>メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-yen-sign w-6 mr-3 text-slate-400"></i><span>原価管理</span>
+            </a>
+            <a href="../reports/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-chart-bar w-6 mr-3 text-slate-400"></i><span>レポート</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-6 py-3">
+                    <div class="flex items-center space-x-4">
+                        <!-- ハンバーガーメニュー + PM System ロゴ -->
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-md hover:from-slate-700 hover:to-slate-800 transition-all cursor-pointer" id="menu-toggle">
+                                <i class="fas fa-bars text-blue-400 text-sm"></i>
+                            </div>
+                            <a href="../dashboard.html" class="text-lg font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent hover:from-blue-600 hover:to-indigo-600 transition-all">PM System</a>
+                        </div>
+                        <div class="w-px h-6 bg-slate-300"></div>
+                        <!-- ページタイトル -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                                <i class="fas fa-folder text-white text-xs"></i>
+                            </div>
+                            <h2 class="text-lg font-semibold text-slate-700">プロジェクト一覧</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700">2024年4月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                                            山
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                    <div class="mt-3 pt-3 border-t border-slate-200">
+                                        <div class="flex items-center text-xs text-slate-500">
+                                            <i class="fas fa-clock mr-2 text-slate-400"></i>
+                                            <span>最終ログイン: 2024年4月9日 18:32</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-user"></i>
+                                    <span>プロフィール</span>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-cog"></i>
+                                    <span>設定</span>
+                                </div>
+                                <div class="user-menu-item logout" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>ログアウト</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- サブヘッダー -->
+            <div class="bg-white border-b border-slate-200 px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <!-- 検索 -->
+                        <div class="relative">
+                            <input type="text" placeholder="プロジェクト名で検索..."
+                                   class="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-72 text-sm shadow-sm">
+                            <i class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
+                        </div>
+                        <!-- 顧客フィルター -->
+                        <select class="border border-slate-300 rounded-lg px-4 py-2 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+                            <option value="">すべての顧客</option>
+                            <option value="abc">株式会社ABC商事</option>
+                            <option value="xyz">XYZ株式会社</option>
+                            <option value="tech">テックソリューション</option>
+                            <option value="global">グローバルトレード</option>
+                        </select>
+                        <!-- ステータスフィルター -->
+                        <select class="border border-slate-300 rounded-lg px-4 py-2 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+                            <option value="">すべてのステータス</option>
+                            <option value="active">進行中</option>
+                            <option value="pending">保留</option>
+                            <option value="completed">完了</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- コンテンツ -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <!-- 株式会社ABC商事 -->
+                <div class="customer-group" id="customer-abc">
+                    <div class="customer-header" onclick="toggleCustomerGroup(this)">
+                        <i class="fas fa-chevron-down customer-toggle mr-3 text-slate-500"></i>
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center shadow-md mr-3">
+                            <i class="fas fa-building text-white text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-slate-800">株式会社ABC商事</h3>
+                            <p class="text-xs text-slate-500">2件のプロジェクト</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">合計予算</p>
+                                <p class="font-semibold text-slate-700">¥13,000,000</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="customer-projects grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+                        <!-- ECサイトリニューアル -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">進行中</span>
+                                    <div class="text-xs text-slate-500">2024/01/15 - 2024/06/30</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">ECサイトリニューアル</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">既存ECサイトのフルリニューアルプロジェクト。UI/UX改善とパフォーマンス向上が主目的。</p>
+
+                                <!-- 進捗バー -->
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">65%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 65%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- メンバーとコスト -->
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">山</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">佐</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">田</div>
+                                        <span class="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-xs font-semibold text-slate-600">+2</span>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥5,000,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 基幹システム更新 -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">進行中</span>
+                                    <div class="text-xs text-slate-500">2024/02/01 - 2024/08/31</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">基幹システム更新</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">レガシーシステムのモダナイゼーション。クラウド移行とAPI連携強化。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">30%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 30%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">鈴</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">高</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥8,000,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 新規プロジェクト追加カード -->
+                        <div class="project-card bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-all cursor-pointer">
+                            <div class="p-5 flex flex-col items-center justify-center h-full min-h-[280px]">
+                                <div class="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                    <i class="fas fa-plus text-2xl text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-500 font-medium">新規プロジェクトを追加</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- XYZ株式会社 -->
+                <div class="customer-group" id="customer-xyz">
+                    <div class="customer-header" onclick="toggleCustomerGroup(this)">
+                        <i class="fas fa-chevron-down customer-toggle mr-3 text-slate-500"></i>
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center shadow-md mr-3">
+                            <i class="fas fa-building text-white text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-slate-800">XYZ株式会社</h3>
+                            <p class="text-xs text-slate-500">2件のプロジェクト</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">合計予算</p>
+                                <p class="font-semibold text-slate-700">¥11,500,000</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="customer-projects grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+                        <!-- 社内業務システム開発 -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">進行中</span>
+                                    <div class="text-xs text-slate-500">2024/02/01 - 2024/05/31</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">社内業務システム開発</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">勤怠管理・経費精算・ワークフローを統合した社内業務システムの新規開発。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">40%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 40%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">山</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">佐</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">田</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥8,000,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- API基盤構築 -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-blue-50 text-blue-600 rounded-full">完了</span>
+                                    <div class="text-xs text-slate-500">2023/10/01 - 2024/01/31</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">API基盤構築</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">マイクロサービス向けAPI基盤の設計・構築。認証・認可機能含む。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">100%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-emerald-500 to-green-500 h-2 rounded-full" style="width: 100%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">山</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">鈴</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">高</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">田</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥3,500,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 新規プロジェクト追加カード -->
+                        <div class="project-card bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-all cursor-pointer">
+                            <div class="p-5 flex flex-col items-center justify-center h-full min-h-[280px]">
+                                <div class="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                    <i class="fas fa-plus text-2xl text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-500 font-medium">新規プロジェクトを追加</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 株式会社テックソリューション -->
+                <div class="customer-group" id="customer-tech">
+                    <div class="customer-header" onclick="toggleCustomerGroup(this)">
+                        <i class="fas fa-chevron-down customer-toggle mr-3 text-slate-500"></i>
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-md mr-3">
+                            <i class="fas fa-building text-white text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-slate-800">株式会社テックソリューション</h3>
+                            <p class="text-xs text-slate-500">1件のプロジェクト</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">合計予算</p>
+                                <p class="font-semibold text-slate-700">¥12,000,000</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="customer-projects grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+                        <!-- モバイルアプリ開発 -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-amber-400 to-yellow-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-amber-50 text-amber-600 rounded-full">保留</span>
+                                    <div class="text-xs text-slate-500">2024/03/01 - 2024/08/31</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">モバイルアプリ開発</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">iOS/Android対応のネイティブモバイルアプリ開発。Flutter採用予定。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">15%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-amber-400 to-yellow-500 h-2 rounded-full" style="width: 15%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">山</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">佐</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥12,000,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 新規プロジェクト追加カード -->
+                        <div class="project-card bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-all cursor-pointer">
+                            <div class="p-5 flex flex-col items-center justify-center h-full min-h-[280px]">
+                                <div class="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                    <i class="fas fa-plus text-2xl text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-500 font-medium">新規プロジェクトを追加</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- グローバルトレード株式会社 -->
+                <div class="customer-group" id="customer-global">
+                    <div class="customer-header" onclick="toggleCustomerGroup(this)">
+                        <i class="fas fa-chevron-down customer-toggle mr-3 text-slate-500"></i>
+                        <div class="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center shadow-md mr-3">
+                            <i class="fas fa-building text-white text-sm"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h3 class="font-semibold text-slate-800">グローバルトレード株式会社</h3>
+                            <p class="text-xs text-slate-500">2件のプロジェクト</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-right">
+                                <p class="text-xs text-slate-500">合計予算</p>
+                                <p class="font-semibold text-slate-700">¥10,500,000</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="customer-projects grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pl-4">
+                        <!-- 在庫管理システム -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">進行中</span>
+                                    <div class="text-xs text-slate-500">2024/02/15 - 2024/07/15</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">在庫管理システム</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">倉庫間の在庫をリアルタイムで一元管理。バーコード/RFID対応。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">55%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 55%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">鈴</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-purple-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">高</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥6,500,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 受発注システム改修 -->
+                        <div class="project-card bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+                            <div class="h-1 bg-gradient-to-r from-green-400 to-emerald-500"></div>
+                            <div class="p-5">
+                                <div class="flex items-center justify-between mb-3">
+                                    <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">進行中</span>
+                                    <div class="text-xs text-slate-500">2024/03/01 - 2024/06/30</div>
+                                </div>
+                                <h3 class="text-lg font-bold text-slate-800 mb-2">
+                                    <a href="show.html" class="hover:text-blue-600 transition-colors">受発注システム改修</a>
+                                </h3>
+                                <p class="text-slate-600 text-sm mb-4 line-clamp-2">既存受発注システムのUI改善と取引先連携機能の追加。</p>
+
+                                <div class="mb-4">
+                                    <div class="flex justify-between text-sm mb-1.5">
+                                        <span class="text-slate-500 font-medium">進捗</span>
+                                        <span class="font-bold text-slate-700">25%</span>
+                                    </div>
+                                    <div class="w-full bg-slate-100 rounded-full h-2">
+                                        <div class="progress-bar bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 25%"></div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-4 border-t border-slate-100">
+                                    <div class="flex -space-x-2">
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-400 to-rose-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">佐</div>
+                                        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 border-2 border-white flex items-center justify-center text-white text-xs font-bold">田</div>
+                                    </div>
+                                    <div class="text-sm">
+                                        <span class="text-slate-500">予算:</span>
+                                        <span class="font-bold text-slate-700">¥4,000,000</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 新規プロジェクト追加カード -->
+                        <div class="project-card bg-white rounded-xl border-2 border-dashed border-slate-300 hover:border-blue-400 transition-all cursor-pointer">
+                            <div class="p-5 flex flex-col items-center justify-center h-full min-h-[280px]">
+                                <div class="w-16 h-16 bg-gradient-to-br from-slate-50 to-slate-100 rounded-full flex items-center justify-center mb-4 shadow-inner">
+                                    <i class="fas fa-plus text-2xl text-slate-400"></i>
+                                </div>
+                                <p class="text-slate-500 font-medium">新規プロジェクトを追加</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 新規プロジェクト作成モーダル -->
+    <div id="new-project-modal" class="fixed inset-0 z-50 hidden">
+        <!-- オーバーレイ -->
+        <div class="modal-overlay absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeModal()"></div>
+
+        <!-- モーダルコンテンツ -->
+        <div class="modal-content absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+            <!-- モーダルヘッダー -->
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                        <i class="fas fa-folder-plus text-white"></i>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-800">新規プロジェクト作成</h3>
+                        <p class="text-xs text-slate-500">プロジェクト情報を入力してください</p>
+                    </div>
+                </div>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- モーダルボディ -->
+            <div class="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
+                <form id="new-project-form">
+                    <!-- 基本情報 -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-4 flex items-center">
+                            <i class="fas fa-info-circle text-blue-500 mr-2"></i>基本情報
+                        </h4>
+                        <div class="space-y-4">
+                            <!-- プロジェクト名 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">プロジェクト名 <span class="text-red-500">*</span></label>
+                                <input type="text" required placeholder="例: ECサイトリニューアル"
+                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all">
+                            </div>
+
+                            <!-- 顧客選択 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">顧客 <span class="text-red-500">*</span></label>
+                                <select required class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all bg-white">
+                                    <option value="">顧客を選択してください</option>
+                                    <option value="abc">株式会社ABC商事</option>
+                                    <option value="xyz">XYZ株式会社</option>
+                                    <option value="tech">株式会社テックソリューション</option>
+                                    <option value="global">グローバルトレード株式会社</option>
+                                </select>
+                            </div>
+
+                            <!-- 説明 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">プロジェクト概要</label>
+                                <textarea rows="3" placeholder="プロジェクトの概要を入力してください"
+                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all resize-none"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 期間・予算 -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-4 flex items-center">
+                            <i class="fas fa-calendar-alt text-emerald-500 mr-2"></i>期間・予算
+                        </h4>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- 開始日 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">開始日 <span class="text-red-500">*</span></label>
+                                <input type="date" required
+                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all">
+                            </div>
+
+                            <!-- 終了日 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">終了日 <span class="text-red-500">*</span></label>
+                                <input type="date" required
+                                    class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all">
+                            </div>
+
+                            <!-- 予算 -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">予算</label>
+                                <div class="relative">
+                                    <span class="absolute left-4 top-1/2 transform -translate-y-1/2 text-slate-400">¥</span>
+                                    <input type="number" placeholder="5,000,000"
+                                        class="w-full pl-8 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all">
+                                </div>
+                            </div>
+
+                            <!-- ステータス -->
+                            <div>
+                                <label class="block text-sm font-medium text-slate-700 mb-1.5">ステータス</label>
+                                <select class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all bg-white">
+                                    <option value="active">進行中</option>
+                                    <option value="pending">保留</option>
+                                    <option value="completed">完了</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- メンバー -->
+                    <div class="mb-6">
+                        <h4 class="text-sm font-semibold text-slate-700 mb-4 flex items-center">
+                            <i class="fas fa-users text-violet-500 mr-2"></i>プロジェクトメンバー
+                        </h4>
+                        <div class="flex flex-wrap gap-2 mb-3">
+                            <span class="inline-flex items-center px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 text-sm">
+                                <div class="w-5 h-5 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 mr-2 flex items-center justify-center text-white text-xs font-bold">山</div>
+                                山田太郎
+                                <button type="button" class="ml-2 text-blue-400 hover:text-blue-600"><i class="fas fa-times text-xs"></i></button>
+                            </span>
+                        </div>
+                        <button type="button" class="inline-flex items-center px-3 py-1.5 border border-dashed border-slate-300 rounded-lg text-sm text-slate-500 hover:border-blue-400 hover:text-blue-500 transition-colors">
+                            <i class="fas fa-plus mr-2"></i>メンバーを追加
+                        </button>
+                    </div>
+
+                    <!-- タグ -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-slate-700 mb-4 flex items-center">
+                            <i class="fas fa-tags text-amber-500 mr-2"></i>タグ
+                        </h4>
+                        <div class="flex flex-wrap gap-2">
+                            <span class="inline-flex items-center px-3 py-1 rounded-full bg-slate-100 text-slate-600 text-sm">
+                                Web開発
+                                <button type="button" class="ml-2 text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xs"></i></button>
+                            </span>
+                            <button type="button" class="inline-flex items-center px-3 py-1 border border-dashed border-slate-300 rounded-full text-sm text-slate-500 hover:border-blue-400 hover:text-blue-500 transition-colors">
+                                <i class="fas fa-plus mr-1"></i>追加
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+
+            <!-- モーダルフッター -->
+            <div class="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+                <button type="button" onclick="closeModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+                    キャンセル
+                </button>
+                <button type="submit" form="new-project-form" class="btn-primary px-5 py-2.5 rounded-lg text-sm font-medium text-white flex items-center">
+                    <i class="fas fa-check mr-2"></i>作成する
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* モーダルアニメーション */
+        #new-project-modal {
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        #new-project-modal.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        #new-project-modal .modal-content {
+            transform: translate(-50%, -50%) scale(0.95);
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        #new-project-modal.show .modal-content {
+            transform: translate(-50%, -50%) scale(1);
+        }
+    </style>
+
+    <script>
+        // サイドバーモーダル
+        const sidebarModal = document.getElementById('sidebar-modal');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+
+        menuToggle.addEventListener('click', () => {
+            sidebarModal.classList.toggle('show');
+            sidebarOverlay.classList.toggle('show');
+        });
+
+        sidebarOverlay.addEventListener('click', () => {
+            sidebarModal.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+        });
+
+        // ユーザーメニュー
+        const userMenuTrigger = document.getElementById('user-menu-trigger');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        const userMenuArrow = document.getElementById('user-menu-arrow');
+
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenuDropdown.classList.toggle('show');
+            userMenuArrow.style.transform = userMenuDropdown.classList.contains('show') ? 'rotate(180deg)' : 'rotate(0deg)';
+        });
+
+        document.addEventListener('click', () => {
+            userMenuDropdown.classList.remove('show');
+            userMenuArrow.style.transform = 'rotate(0deg)';
+        });
+
+        // ログアウト
+        function logout() {
+            if (confirm('ログアウトしますか？')) {
+                alert('ログアウトしました');
+            }
+        }
+
+        // 顧客グループ折りたたみ
+        function toggleCustomerGroup(header) {
+            header.classList.toggle('collapsed');
+        }
+
+        // モーダル関連
+        const modal = document.getElementById('new-project-modal');
+
+        function openModal() {
+            modal.classList.remove('hidden');
+            setTimeout(() => modal.classList.add('show'), 10);
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeModal() {
+            modal.classList.remove('show');
+            setTimeout(() => {
+                modal.classList.add('hidden');
+                document.body.style.overflow = '';
+            }, 300);
+        }
+
+        // ESCキーでモーダルを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && modal.classList.contains('show')) {
+                closeModal();
+            }
+        });
+
+        // 新規プロジェクトカードにクリックイベントを追加
+        document.querySelectorAll('.project-card.border-dashed').forEach(card => {
+            card.addEventListener('click', openModal);
+        });
+
+        // フォーム送信
+        document.getElementById('new-project-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            alert('プロジェクトが作成されました！');
+            closeModal();
+        });
+
+    </script>
+</body>
+</html>

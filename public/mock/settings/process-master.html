@@ -1,0 +1,867 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>工程マスタ - プロジェクト管理システム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .card-shadow {
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .process-table th {
+      background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+    }
+
+    .process-table tbody tr {
+      transition: all 0.2s ease;
+    }
+
+    .process-table tbody tr:hover {
+      background: #f8fafc;
+    }
+
+    .cursor-move {
+      cursor: move;
+    }
+
+    .reorder-saving {
+      animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: .7;
+      }
+    }
+
+    /* モーダルアニメーション */
+    #process-modal {
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.3s, visibility 0.3s;
+    }
+
+    #process-modal.show {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    #process-modal .modal-content {
+      transform: translate(-50%, -50%) scale(0.95);
+      transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    #process-modal.show .modal-content {
+      transform: translate(-50%, -50%) scale(1);
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="flex h-screen overflow-hidden">
+    <!-- メインコンテンツ -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- ヘッダー -->
+      <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+        <div class="flex items-center justify-between px-8 py-3">
+          <div class="flex items-center space-x-4">
+            <a href="../dashboard.html" class="flex items-center space-x-2">
+              <i class="fas fa-project-diagram text-blue-500"></i>
+              <span class="font-bold text-slate-800">PM System</span>
+            </a>
+            <div class="h-6 w-px bg-slate-300"></div>
+            <div
+              class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md">
+              <i class="fas fa-stream text-white text-xs"></i>
+            </div>
+            <h2 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
+              工程マスタ</h2>
+          </div>
+          <div class="flex items-center space-x-4">
+            <a href="../settings.html"
+              class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm hover:bg-slate-50 transition-colors">
+              <i class="fas fa-arrow-left text-slate-400 text-xs"></i>
+              <span class="text-xs font-medium text-slate-700">設定に戻る</span>
+            </a>
+            <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <i class="fas fa-calendar text-slate-400 text-xs"></i>
+              <span class="text-xs font-medium text-slate-700">2024年4月10日</span>
+            </div>
+            <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+              <span class="text-sm font-medium text-slate-700">山田太郎</span>
+              <i class="fas fa-chevron-down text-slate-400 text-xs ml-1"></i>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- サブヘッダー -->
+      <div class="bg-white border-b border-slate-200 px-6 py-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-4">
+            <!-- 検索 -->
+            <div class="relative">
+              <input type="text" placeholder="工程名で検索..."
+                class="pl-10 pr-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-72 text-sm shadow-sm">
+              <i class="fas fa-search absolute left-3 top-2.5 text-slate-400"></i>
+            </div>
+            <!-- ステータスフィルター -->
+            <select
+              class="border border-slate-300 rounded-lg px-4 py-2 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm">
+              <option value="">すべてのステータス</option>
+              <option value="active">有効</option>
+              <option value="inactive">無効</option>
+            </select>
+          </div>
+          <button onclick="openModal('add')"
+            class="btn-primary px-4 py-2 rounded-lg text-sm font-medium text-white flex items-center">
+            <i class="fas fa-plus mr-2"></i>工程追加
+          </button>
+        </div>
+      </div>
+
+      <!-- コンテンツ -->
+      <main class="flex-1 overflow-y-auto p-6">
+        <!-- 統計カード -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6 fade-in">
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-list text-white text-lg"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-xs text-slate-500 font-medium">総工程数</p>
+                <p class="text-2xl font-bold text-slate-800">8件</p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-check-circle text-white text-lg"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-xs text-slate-500 font-medium">有効</p>
+                <p class="text-2xl font-bold text-slate-800">7件</p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-ban text-white text-lg"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-xs text-slate-500 font-medium">無効</p>
+                <p class="text-2xl font-bold text-slate-800">1件</p>
+              </div>
+            </div>
+          </div>
+          <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 p-5">
+            <div class="flex items-center">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-clock text-white text-lg"></i>
+              </div>
+              <div class="ml-4">
+                <p class="text-xs text-slate-500 font-medium">最終更新</p>
+                <p class="text-2xl font-bold text-slate-800">今日</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
+        <!-- 工程テーブル -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-200/80 overflow-hidden fade-in">
+          <!-- 並び替え保存ボタン（初期は非表示） -->
+          <div id="save-reorder-container"
+            class="hidden px-6 py-3 bg-blue-50 border-b border-blue-100 flex items-center justify-between">
+            <div class="flex items-center text-blue-700 text-sm font-medium">
+              <i class="fas fa-info-circle mr-2"></i>
+              工程の順序が変更されました。変更を確定するには保存してください。
+            </div>
+            <button onclick="saveReorder()"
+              class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-1.5 rounded-lg text-sm font-semibold shadow-sm transition-all flex items-center">
+              <i class="fas fa-save mr-2"></i>並び替えを保存
+            </button>
+          </div>
+
+          <table class="process-table w-full">
+            <thead>
+              <tr class="border-b border-slate-200">
+                <th class="text-center px-4 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider w-8">
+                </th>
+                <th class="text-left px-2 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider w-12">No
+                </th>
+                <th class="text-left px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">工程名</th>
+                <th class="text-left px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">説明</th>
+                <th class="text-center px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">ステータス
+                </th>
+                <th class="text-center px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">更新日</th>
+                <th class="text-center px-6 py-4 text-xs font-semibold text-slate-600 uppercase tracking-wider">操作</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              <!-- 工程1: 要件定義 -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">1</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-clipboard-list text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">要件定義</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">顧客要件のヒアリングと要件定義書の作成</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/10</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 1)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(1, '要件定義')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程2: 基本設計 -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">2</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-drafting-compass text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">基本設計</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">システム全体の基本設計と画面設計</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/09</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 2)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(2, '基本設計')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程3: 詳細設計 -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">3</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-file-alt text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">詳細設計</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">機能ごとの詳細設計とDB設計</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/08</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 3)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(3, '詳細設計')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程4: 開発・実装 -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">4</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-code text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">開発・実装</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">プログラミングとコーディング作業</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/07</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 4)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(4, '開発・実装')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程5: 単体テスト -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">5</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-vial text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">単体テスト</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">個別のプログラムやモジュールの動作確認</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/06</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 5)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(5, '単体テスト')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程6: 結合テスト -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">6</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-flask text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">結合テスト</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">システム全体の統合テスト</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/05</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 6)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(6, '結合テスト')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <!-- 工程7: 本番リリース -->
+              <tr draggable="true" ondragstart="dragStart(event)" ondragover="dragOver(event)" ondrop="drop(event)"
+                ondragend="dragEnd(event)">
+                <td class="px-4 py-4 text-center cursor-move">
+                  <i class="fas fa-grip-vertical text-slate-400 hover:text-blue-600 transition-colors"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-500 row-no">7</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-rocket text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">本番リリース</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-600">本番環境へのデプロイと公開</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-emerald-50 text-emerald-600 rounded-full">有効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-500">2024/04/04</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 7)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(7, '本番リリース')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+              <tr class="bg-slate-50/50">
+                <td class="px-4 py-4 text-center">
+                  <i class="fas fa-grip-vertical text-slate-300"></i>
+                </td>
+                <td class="px-2 py-4 text-sm font-medium text-slate-400 row-no">8</td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center opacity-60">
+                    <div
+                      class="w-10 h-10 rounded-lg bg-gradient-to-br from-slate-400 to-slate-600 flex items-center justify-center shadow-md mr-3">
+                      <i class="fas fa-tools text-white text-sm"></i>
+                    </div>
+                    <div>
+                      <div class="font-semibold text-slate-800">保守・運用</div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4">
+                  <span class="text-sm text-slate-400">システムの保守と運用サポート</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="px-2.5 py-1 text-xs font-semibold bg-slate-100 text-slate-500 rounded-full">無効</span>
+                </td>
+                <td class="px-6 py-4 text-center">
+                  <span class="text-sm text-slate-400">2024/03/20</span>
+                </td>
+                <td class="px-6 py-4">
+                  <div class="flex items-center justify-center space-x-2">
+                    <button onclick="openModal('edit', 8)"
+                      class="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="編集">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button onclick="confirmDelete(8, '保守・運用')"
+                      class="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="削除">
+                      <i class="fas fa-trash"></i>
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <!-- 追加・編集モーダル -->
+  <div id="process-modal" class="fixed inset-0 z-[100] hidden">
+    <div class="modal-overlay absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onclick="closeModal()"></div>
+    <div
+      class="modal-content absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
+      <!-- モーダルヘッダー -->
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50/50">
+        <div class="flex items-center space-x-3">
+          <div id="modal-icon-container"
+            class="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+            <i id="modal-icon" class="fas fa-plus text-white text-sm"></i>
+          </div>
+          <div>
+            <h3 id="modal-title" class="text-lg font-bold text-slate-800">工程追加</h3>
+            <p id="modal-subtitle" class="text-xs text-slate-500">新しい工程の情報を入力してください</p>
+          </div>
+        </div>
+        <button onclick="closeModal()"
+          class="w-8 h-8 rounded-lg hover:bg-slate-200 flex items-center justify-center text-slate-400 hover:text-slate-600 transition-colors">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- モーダルボディ -->
+      <div class="p-6">
+        <form id="process-form" onsubmit="handleFormSubmit(event)">
+          <input type="hidden" id="process-id">
+          <div class="space-y-4">
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">工程名 <span
+                  class="text-red-500">*</span></label>
+              <input type="text" id="process-name" required placeholder="例: システムテスト"
+                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all outline-none">
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">説明</label>
+              <textarea id="process-description" rows="3" placeholder="工程の詳細な内容を入力してください"
+                class="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all resize-none outline-none"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm font-semibold text-slate-700 mb-1.5">ステータス</label>
+              <div class="flex items-center space-x-4">
+                <label class="flex items-center cursor-pointer group">
+                  <input type="radio" name="status" value="active" checked class="hidden peer">
+                  <div
+                    class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 peer-checked:bg-blue-50 peer-checked:border-blue-200 peer-checked:text-blue-600 transition-all group-hover:border-slate-300">
+                    <i class="fas fa-check-circle mr-1.5 opacity-0 peer-checked:opacity-100"></i>有効
+                  </div>
+                </label>
+                <label class="flex items-center cursor-pointer group">
+                  <input type="radio" name="status" value="inactive" class="hidden peer">
+                  <div
+                    class="px-4 py-2 rounded-lg border border-slate-200 text-sm font-medium text-slate-600 peer-checked:bg-slate-100 peer-checked:border-slate-300 peer-checked:text-slate-600 transition-all group-hover:border-slate-300">
+                    <i class="fas fa-ban mr-1.5 opacity-0 peer-checked:opacity-100"></i>無効
+                  </div>
+                </label>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <!-- モーダルフッター -->
+      <div class="flex items-center justify-end space-x-3 px-6 py-4 border-t border-slate-200 bg-slate-50/50">
+        <button type="button" onclick="closeModal()"
+          class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">
+          キャンセル
+        </button>
+        <button type="submit" form="process-form" id="submit-button"
+          class="btn-primary px-6 py-2.5 rounded-lg text-sm font-bold text-white flex items-center shadow-md">
+          <i class="fas fa-check mr-2"></i><span id="submit-button-text">登録する</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('process-modal');
+    const form = document.getElementById('process-form');
+
+    function openModal(mode, id) {
+      const title = document.getElementById('modal-title');
+      const subtitle = document.getElementById('modal-subtitle');
+      const icon = document.getElementById('modal-icon');
+      const iconContainer = document.getElementById('modal-icon-container');
+      const submitBtnText = document.getElementById('submit-button-text');
+      const processIdInput = document.getElementById('process-id');
+
+      // フォームのリセット
+      form.reset();
+      processIdInput.value = id || '';
+
+      if (mode === 'add') {
+        title.textContent = '工程追加';
+        subtitle.textContent = '新しい工程の情報を入力してください';
+        icon.className = 'fas fa-plus text-white text-sm';
+        iconContainer.className = 'w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg';
+        submitBtnText.textContent = '登録する';
+      } else {
+        title.textContent = '工程編集';
+        subtitle.textContent = '工程の情報を更新してください';
+        icon.className = 'fas fa-edit text-white text-sm';
+        iconContainer.className = 'w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center shadow-lg';
+        submitBtnText.textContent = '更新する';
+
+        // 編集モードの場合、既存のデータを取得してセット（モック）
+        if (id) {
+          const row = Array.from(document.querySelectorAll('.process-table tbody tr')).find(r => {
+            const editBtn = r.querySelector('button[onclick*="openModal(\'edit\'"]');
+            return editBtn && editBtn.getAttribute('onclick').includes(id);
+          });
+
+          if (row) {
+            const name = row.querySelector('.font-semibold').textContent.trim();
+            const desc = row.querySelector('td:nth-child(4) span').textContent.trim();
+            const status = row.querySelector('td:nth-child(5) span').textContent.trim() === '有効' ? 'active' : 'inactive';
+
+            document.getElementById('process-name').value = name;
+            document.getElementById('process-description').value = desc;
+            document.querySelector(`input[name="status"][value="${status}"]`).checked = true;
+          }
+        }
+      }
+
+      modal.classList.remove('hidden');
+      setTimeout(() => {
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+      }, 10);
+    }
+
+    function closeModal() {
+      modal.classList.remove('show');
+      setTimeout(() => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }, 300);
+    }
+
+    function handleFormSubmit(e) {
+      e.preventDefault();
+      const mode = document.getElementById('process-id').value ? '更新' : '登録';
+      const btn = document.getElementById('submit-button');
+      const originalContent = btn.innerHTML;
+
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>処理中...';
+
+      setTimeout(() => {
+        alert(`工程を${mode}しました。`);
+        closeModal();
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+      }, 600);
+    }
+
+    // ESCキーでモーダルを閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && modal.classList.contains('show')) {
+        closeModal();
+      }
+    });
+
+    function confirmDelete(id, name) {
+      if (confirm(`「${name}」を削除してもよろしいですか?`)) {
+        alert(`工程ID ${id} を削除しました`);
+      }
+    }
+
+    let draggedRow = null;
+    let isOrderChanged = false;
+
+    function dragStart(e) {
+      draggedRow = e.target.closest('tr');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', draggedRow.innerHTML);
+      draggedRow.style.opacity = '0.5';
+    }
+
+    function dragOver(e) {
+      if (e.preventDefault) {
+        e.preventDefault();
+      }
+      e.dataTransfer.dropEffect = 'move';
+
+      const targetRow = e.target.closest('tr');
+      if (targetRow && targetRow !== draggedRow && targetRow.parentNode === draggedRow.parentNode) {
+        const tbody = targetRow.parentNode;
+        const rows = Array.from(tbody.querySelectorAll('tr'));
+        const draggedIndex = rows.indexOf(draggedRow);
+        const targetIndex = rows.indexOf(targetRow);
+
+        if (draggedIndex < targetIndex) {
+          tbody.insertBefore(draggedRow, targetRow.nextSibling);
+        } else {
+          tbody.insertBefore(draggedRow, targetRow);
+        }
+
+        // 順序が変更されたフラグを立てる
+        isOrderChanged = true;
+      }
+      return false;
+    }
+
+    function drop(e) {
+      if (e.stopPropagation) {
+        e.stopPropagation();
+      }
+      return false;
+    }
+
+    function dragEnd(e) {
+      if (draggedRow) {
+        draggedRow.style.opacity = '';
+        draggedRow = null;
+      }
+
+      if (isOrderChanged) {
+        showSaveButton();
+      }
+    }
+
+    function showSaveButton() {
+      const container = document.getElementById('save-reorder-container');
+      container.classList.remove('hidden');
+      container.classList.add('flex', 'fade-in');
+    }
+
+    function saveReorder() {
+      // 保存ボタンをローディング状態にする（モック）
+      const btn = document.querySelector('#save-reorder-container button');
+      const originalContent = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>保存中...';
+
+      // 少し待ってから保存完了とする
+      setTimeout(() => {
+        updateNumbers();
+        isOrderChanged = false;
+
+        const container = document.getElementById('save-reorder-container');
+        container.classList.add('hidden');
+        container.classList.remove('flex');
+
+        btn.disabled = false;
+        btn.innerHTML = originalContent;
+
+        alert('工程の順序を保存しました。');
+      }, 800);
+    }
+
+    function updateNumbers() {
+      const rows = document.querySelectorAll('.process-table tbody tr');
+      rows.forEach((row, index) => {
+        const noCell = row.querySelector('.row-no');
+        if (noCell) {
+          noCell.textContent = index + 1;
+          // アニメーション効果
+          noCell.classList.add('text-blue-600', 'font-bold');
+          setTimeout(() => {
+            noCell.classList.remove('text-blue-600', 'font-bold');
+          }, 2000);
+        }
+      });
+    }
+
+    // 初期表示時にも番号を振る
+    document.addEventListener('DOMContentLoaded', updateNumbers);
+  </script>
+</body>
+
+</html>

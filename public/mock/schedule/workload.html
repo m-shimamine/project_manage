@@ -1,0 +1,1072 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>担当者稼働 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script>window.jQuery || document.write('<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"><\/script>')</script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        /* ガントチャートセル - 1日あたり40px */
+        .gantt-cell {
+            min-width: 40px;
+            width: 40px;
+            height: 32px;
+        }
+        /* タスク行の高さ */
+        .task-row {
+            height: 36px;
+            min-height: 36px;
+        }
+        /* 担当者ヘッダー行 */
+        .member-header-row {
+            height: 44px;
+            min-height: 44px;
+            background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+        }
+        .task-bar {
+            height: 24px;
+            border-radius: 4px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .task-bar:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+        }
+        .task-bar span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: calc(100% - 10px);
+        }
+        .scroll-sync {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+        }
+        .scroll-sync::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .scroll-sync::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        .scroll-sync::-webkit-scrollbar-thumb {
+            background-color: rgba(156, 163, 175, 0.6);
+            border-radius: 5px;
+        }
+        .scroll-sync::-webkit-scrollbar-thumb:hover {
+            background-color: rgba(156, 163, 175, 0.8);
+        }
+        .weekend-sat {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        }
+        .weekend-sun {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+        }
+        .today-marker {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            font-weight: 700;
+            color: #92400e;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+
+        /* トグルボタン */
+        .toggle-btn-group {
+            display: inline-flex;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid #e2e8f0;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+        }
+        .toggle-btn-item {
+            padding: 6px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            background: white;
+            color: #64748b;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle-btn-item:not(:last-child) {
+            border-right: 1px solid #e2e8f0;
+        }
+        .toggle-btn-item:hover:not(.active) {
+            background: #f8fafc;
+        }
+        .toggle-btn-item.active {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: white;
+        }
+
+        /* ユーザーメニュー */
+        .user-menu-container {
+            position: relative;
+        }
+        .user-menu-trigger {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-menu-trigger:hover {
+            background: #f8fafc;
+        }
+        .user-menu-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 280px;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+            border: 1px solid #e2e8f0;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-10px);
+            transition: all 0.2s ease;
+            z-index: 100;
+        }
+        .user-menu-dropdown.show {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .user-menu-header {
+            padding: 16px;
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .user-menu-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 16px;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+        .user-menu-item:hover {
+            background: #f8fafc;
+        }
+        .user-menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            color: #64748b;
+        }
+        .user-menu-item.logout {
+            border-top: 1px solid #e2e8f0;
+            color: #ef4444;
+        }
+        .user-menu-item.logout i {
+            color: #ef4444;
+        }
+
+        /* 稼働率インジケーター */
+        .workload-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .workload-low {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .workload-normal {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+        .workload-high {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .workload-over {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* プロジェクト色 */
+        .project-color-1 { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+        .project-color-2 { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .project-color-3 { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        .project-color-4 { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+        .project-color-5 { background: linear-gradient(135deg, #ec4899 0%, #db2777 100%); }
+        .project-color-6 { background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%); }
+        .project-color-7 { background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%); }
+
+        /* ドラッグスクロール用カーソル */
+        #gantt-chart-scroll, #gantt-header-scroll {
+            cursor: grab;
+        }
+        #gantt-chart-scroll.cursor-grabbing, #gantt-header-scroll.cursor-grabbing {
+            cursor: grabbing;
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <!-- サイドバーオーバーレイ -->
+    <div class="sidebar-modal-overlay" id="sidebar-overlay"></div>
+
+    <!-- サイドバーモーダル -->
+    <aside class="sidebar-modal" id="sidebar-modal">
+        <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <a href="../dashboard.html" class="flex items-center">
+                <div class="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <i class="fas fa-cube text-white text-lg"></i>
+                </div>
+                <span class="ml-3 text-white font-bold text-lg">PMS</span>
+            </a>
+            <button id="close-sidebar" class="text-slate-400 hover:text-white p-2">
+                <i class="fas fa-times text-xl"></i>
+            </button>
+        </div>
+        <nav class="mt-4">
+            <a href="../dashboard.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-tachometer-alt w-5 mr-3 text-slate-400"></i><span>ダッシュボード</span>
+            </a>
+            <a href="../customers/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-building w-5 mr-3 text-slate-400"></i><span>顧客</span>
+            </a>
+            <a href="../projects/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-folder w-5 mr-3 text-slate-400"></i><span>プロジェクト</span>
+            </a>
+            <a href="index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-calendar-alt w-5 mr-3 text-slate-400"></i><span>スケジュール</span>
+            </a>
+            <a href="workload.html" class="nav-item active flex items-center px-4 py-3 text-white">
+                <i class="fas fa-user-clock w-5 mr-3 text-blue-400"></i><span>担当者稼働</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-users w-5 mr-3 text-slate-400"></i><span>メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-yen-sign w-5 mr-3 text-slate-400"></i><span>原価管理</span>
+            </a>
+            <a href="../reports/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-chart-bar w-5 mr-3 text-slate-400"></i><span>レポート</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-6 py-3">
+                    <div class="flex items-center space-x-4">
+                        <!-- ハンバーガーメニュー + PM System ロゴ -->
+                        <div class="flex items-center space-x-3">
+                            <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-md hover:from-slate-700 hover:to-slate-800 transition-all cursor-pointer" id="menu-toggle">
+                                <i class="fas fa-bars text-blue-400 text-sm"></i>
+                            </div>
+                            <a href="../dashboard.html" class="text-lg font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent hover:from-blue-600 hover:to-indigo-600 transition-all">PM System</a>
+                        </div>
+                        <div class="w-px h-6 bg-slate-300"></div>
+                        <!-- ページタイトル -->
+                        <div class="flex items-center space-x-2">
+                            <div class="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-sm">
+                                <i class="fas fa-user-clock text-white text-xs"></i>
+                            </div>
+                            <h2 class="text-lg font-semibold text-slate-700">担当者稼働</h2>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700" id="today-display">2025年1月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                                            山
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-user"></i>
+                                    <span>プロフィール</span>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-cog"></i>
+                                    <span>設定</span>
+                                </div>
+                                <div class="user-menu-item logout" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>ログアウト</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- サブヘッダー -->
+            <div class="bg-white border-b border-slate-200 px-6 py-3">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <!-- 担当者選択 -->
+                        <select id="member-select" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" style="min-width: 200px;" onchange="onMemberChange(this.value)">
+                            <option value="all" selected>全担当者</option>
+                        </select>
+
+                        <!-- 稼働率凡例 -->
+                        <div class="flex items-center space-x-3 text-xs">
+                            <span class="workload-indicator workload-low">余裕 ~70%</span>
+                            <span class="workload-indicator workload-normal">適正 70-100%</span>
+                            <span class="workload-indicator workload-high">高稼働 100-120%</span>
+                            <span class="workload-indicator workload-over">過負荷 120%~</span>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center space-x-3">
+                        <!-- 年選択 -->
+                        <select id="year-select" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" onchange="updateMonthSelect()">
+                        </select>
+                        <!-- 月選択 -->
+                        <select id="month-select" class="border border-slate-300 rounded-lg px-3 py-1.5 text-sm font-medium bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 shadow-sm" onchange="scrollToSelectedMonth()">
+                        </select>
+
+                        <!-- 今日ボタン -->
+                        <button onclick="scrollToToday()" class="px-4 py-1.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm bg-white">
+                            今日
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 稼働一覧エリア -->
+            <main class="flex-1 overflow-hidden bg-white flex flex-col">
+                <!-- ヘッダー固定部分 -->
+                <div class="flex flex-shrink-0 border-b-2 border-slate-300">
+                    <!-- 左側ヘッダー -->
+                    <div class="flex-shrink-0 border-r-2 border-slate-300 bg-slate-100" style="width: 400px; min-width: 400px;">
+                        <!-- 月ヘッダー行 -->
+                        <div class="flex items-center border-b border-slate-200 bg-slate-200 h-10">
+                            <div class="flex-1 px-3 text-sm font-bold text-slate-600 text-center">担当者 / タスク一覧</div>
+                        </div>
+                        <!-- カラムヘッダー -->
+                        <div class="flex items-center bg-slate-50 h-8 border-b border-slate-200">
+                            <div class="w-40 px-2 text-xs font-bold text-slate-700">担当者 / タスク名</div>
+                            <div class="w-32 px-1 text-xs font-bold text-slate-700 text-center border-l border-slate-200">プロジェクト</div>
+                            <div class="w-16 px-1 text-xs font-bold text-slate-700 text-center border-l border-slate-200">開始日</div>
+                            <div class="w-16 px-1 text-xs font-bold text-slate-700 text-center border-l border-slate-200">終了日</div>
+                            <div class="w-12 px-1 text-xs font-bold text-slate-700 text-center border-l border-slate-200">進捗</div>
+                        </div>
+                    </div>
+                    <!-- 右側ヘッダー（カレンダー） -->
+                    <div class="flex-1 overflow-hidden bg-white" id="gantt-header-container">
+                        <div class="overflow-x-auto scroll-sync" id="gantt-header-scroll" style="overflow-y: hidden;">
+                            <div style="min-width: max-content;">
+                                <!-- 月ヘッダー -->
+                                <div class="flex h-10" id="month-header"></div>
+                                <!-- 日付ヘッダー -->
+                                <div class="flex h-8 bg-slate-50" id="date-header"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- スクロール可能なコンテンツ部分 -->
+                <div class="flex flex-1 overflow-hidden">
+                    <!-- 左側（タスクリスト） -->
+                    <div class="flex-shrink-0 border-r-2 border-slate-300 overflow-y-auto scroll-sync" id="task-list-scroll" style="width: 400px; min-width: 400px;">
+                        <div id="task-list"></div>
+                    </div>
+                    <!-- 右側（ガントチャート） -->
+                    <div class="flex-1 overflow-auto scroll-sync" id="gantt-chart-scroll">
+                        <div id="gantt-chart" style="min-width: max-content;"></div>
+                    </div>
+                </div>
+            </main>
+
+            <!-- フッター -->
+            <footer class="bg-white border-t border-slate-200 px-6 py-2">
+                <div class="flex items-center justify-between text-xs text-slate-500">
+                    <span>担当者数: <strong id="member-count">0</strong>名 / タスク数: <strong id="task-count">0</strong>件</span>
+                    <span>表示期間: <strong id="display-period">-</strong></span>
+                </div>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        // ========================================
+        // データ定義
+        // ========================================
+        var TODAY = new Date();
+        // デモ用に2025年1月に固定
+        var currentYear = 2025;
+        var currentMonth = 0; // 1月
+        var selectedMember = 'all';
+
+        // 月データ（1月から12月まで）
+        var MONTHS_DATA = [];
+
+        // メンバーデータ
+        var membersData = [
+            { id: 1, name: '山田 太郎', department: '開発部' },
+            { id: 2, name: '佐藤 花子', department: '開発部' },
+            { id: 3, name: '鈴木 一郎', department: 'デザイン部' },
+            { id: 4, name: '田中 美咲', department: '開発部' },
+            { id: 5, name: '高橋 健太', department: 'インフラ部' },
+            { id: 6, name: '伊藤 由美', department: '開発部' },
+            { id: 7, name: '渡辺 翔太', department: '開発部' },
+            { id: 8, name: '中村 愛', department: 'デザイン部' }
+        ];
+
+        // プロジェクトデータ
+        var projectsData = {
+            1: { name: 'ECサイトリニューアル', customer: '株式会社ABC商事', color: 1 },
+            2: { name: '基幹システム更新', customer: '株式会社ABC商事', color: 2 },
+            3: { name: '社内業務システム開発', customer: 'XYZ株式会社', color: 3 },
+            4: { name: '勤怠管理システム', customer: 'XYZ株式会社', color: 4 },
+            5: { name: 'モバイルアプリ開発', customer: '株式会社テックソリューション', color: 5 },
+            6: { name: '在庫管理システム', customer: 'グローバルトレード株式会社', color: 6 },
+            7: { name: '受発注システム改修', customer: 'グローバルトレード株式会社', color: 7 }
+        };
+
+        // タスクデータ（各メンバーのタスク）
+        var tasksData = [
+            // 山田 太郎
+            { id: 1, memberId: 1, projectId: 1, name: '要件定義', planStart: '2025-01-06', planEnd: '2025-01-17', progress: 80 },
+            { id: 2, memberId: 1, projectId: 2, name: 'DB設計', planStart: '2025-01-13', planEnd: '2025-01-24', progress: 50 },
+            { id: 3, memberId: 1, projectId: 1, name: '基本設計', planStart: '2025-01-20', planEnd: '2025-02-07', progress: 20 },
+            // 佐藤 花子
+            { id: 4, memberId: 2, projectId: 5, name: 'API設計', planStart: '2025-01-08', planEnd: '2025-01-20', progress: 100 },
+            { id: 5, memberId: 2, projectId: 5, name: 'バックエンド開発', planStart: '2025-01-21', planEnd: '2025-02-14', progress: 30 },
+            { id: 6, memberId: 2, projectId: 3, name: 'レビュー対応', planStart: '2025-01-15', planEnd: '2025-01-17', progress: 100 },
+            // 鈴木 一郎
+            { id: 7, memberId: 3, projectId: 1, name: 'UIデザイン', planStart: '2025-01-06', planEnd: '2025-01-24', progress: 70 },
+            { id: 8, memberId: 3, projectId: 5, name: 'アプリデザイン', planStart: '2025-01-27', planEnd: '2025-02-14', progress: 0 },
+            // 田中 美咲
+            { id: 9, memberId: 4, projectId: 3, name: 'フロントエンド開発', planStart: '2025-01-06', planEnd: '2025-01-31', progress: 60 },
+            { id: 10, memberId: 4, projectId: 4, name: '画面実装', planStart: '2025-01-20', planEnd: '2025-02-07', progress: 10 },
+            // 高橋 健太
+            { id: 11, memberId: 5, projectId: 6, name: 'インフラ構築', planStart: '2025-01-13', planEnd: '2025-01-24', progress: 90 },
+            { id: 12, memberId: 5, projectId: 6, name: 'デプロイ設定', planStart: '2025-01-27', planEnd: '2025-01-31', progress: 0 },
+            { id: 13, memberId: 5, projectId: 2, name: 'サーバー移行', planStart: '2025-02-03', planEnd: '2025-02-14', progress: 0 },
+            // 伊藤 由美
+            { id: 14, memberId: 6, projectId: 1, name: 'テスト設計', planStart: '2025-01-20', planEnd: '2025-01-31', progress: 40 },
+            { id: 15, memberId: 6, projectId: 3, name: '結合テスト', planStart: '2025-02-03', planEnd: '2025-02-14', progress: 0 },
+            // 渡辺 翔太
+            { id: 16, memberId: 7, projectId: 7, name: '改修対応', planStart: '2025-01-06', planEnd: '2025-01-17', progress: 100 },
+            { id: 17, memberId: 7, projectId: 7, name: 'テスト実施', planStart: '2025-01-20', planEnd: '2025-01-24', progress: 50 },
+            { id: 18, memberId: 7, projectId: 4, name: 'コードレビュー', planStart: '2025-01-27', planEnd: '2025-01-31', progress: 0 },
+            // 中村 愛
+            { id: 19, memberId: 8, projectId: 5, name: 'アイコン制作', planStart: '2025-01-08', planEnd: '2025-01-15', progress: 100 },
+            { id: 20, memberId: 8, projectId: 1, name: 'バナー制作', planStart: '2025-01-16', planEnd: '2025-01-22', progress: 80 },
+            { id: 21, memberId: 8, projectId: 6, name: 'UI改善', planStart: '2025-01-27', planEnd: '2025-02-07', progress: 0 }
+        ];
+
+        // ========================================
+        // 初期化
+        // ========================================
+        $(document).ready(function() {
+            generateMonthsData();
+            initYearMonthSelect();
+            initMemberSelect();
+            generateCalendarHeader();
+            generateTaskList();
+            generateGanttChart();
+            setupScrollSync();
+            setupSidebar();
+            setupUserMenu();
+            updateFooter();
+            updateTodayDisplay();
+
+            // 今日の位置にスクロール
+            setTimeout(function() {
+                scrollToToday();
+            }, 100);
+        });
+
+        // ========================================
+        // 月データ生成
+        // ========================================
+        function generateMonthsData() {
+            MONTHS_DATA = [];
+            // 1月から12月まで
+            for (var m = 0; m < 12; m++) {
+                var daysInMonth = new Date(currentYear, m + 1, 0).getDate();
+                var days = [];
+                for (var d = 1; d <= daysInMonth; d++) {
+                    var date = new Date(currentYear, m, d);
+                    days.push({
+                        date: d,
+                        dayOfWeek: date.getDay(),
+                        dateObj: date,
+                        dateStr: formatDate(date)
+                    });
+                }
+                MONTHS_DATA.push({
+                    year: currentYear,
+                    month: m + 1,
+                    name: (m + 1) + '月',
+                    days: days
+                });
+            }
+        }
+
+        // ========================================
+        // 年月選択初期化
+        // ========================================
+        function initYearMonthSelect() {
+            var $yearSelect = $('#year-select');
+            var $monthSelect = $('#month-select');
+
+            $yearSelect.empty();
+            for (var y = currentYear - 1; y <= currentYear + 1; y++) {
+                var selected = (y === currentYear) ? ' selected' : '';
+                $yearSelect.append('<option value="' + y + '"' + selected + '>' + y + '年</option>');
+            }
+
+            updateMonthSelect();
+        }
+
+        function updateMonthSelect() {
+            var selectedYear = parseInt($('#year-select').val());
+            var $monthSelect = $('#month-select');
+            $monthSelect.empty();
+
+            for (var m = 1; m <= 12; m++) {
+                var selected = (selectedYear === currentYear && m === currentMonth + 1) ? ' selected' : '';
+                $monthSelect.append('<option value="' + m + '"' + selected + '>' + m + '月</option>');
+            }
+
+            // 年が変わったら再生成
+            if (selectedYear !== currentYear) {
+                currentYear = selectedYear;
+                generateMonthsData();
+                generateCalendarHeader();
+                generateGanttChart();
+                updateFooter();
+            }
+        }
+
+        function scrollToSelectedMonth() {
+            var selectedMonth = parseInt($('#month-select').val());
+            var targetDate = new Date(currentYear, selectedMonth - 1, 1);
+            scrollToDate(targetDate);
+        }
+
+        // ========================================
+        // 担当者選択初期化
+        // ========================================
+        function initMemberSelect() {
+            var $select = $('#member-select');
+            membersData.forEach(function(member) {
+                $select.append('<option value="' + member.id + '">' + member.name + '</option>');
+            });
+        }
+
+        function onMemberChange(value) {
+            selectedMember = value;
+            generateTaskList();
+            generateGanttChart();
+            updateFooter();
+        }
+
+        // ========================================
+        // カレンダーヘッダー生成
+        // ========================================
+        function generateCalendarHeader() {
+            var $monthHeader = $('#month-header');
+            var $dateHeader = $('#date-header');
+            $monthHeader.empty();
+            $dateHeader.empty();
+
+            var weekDays = ['日', '月', '火', '水', '木', '金', '土'];
+
+            MONTHS_DATA.forEach(function(monthData) {
+                // 月ヘッダー
+                var monthWidth = monthData.days.length * 40;
+                $monthHeader.append(
+                    '<div class="flex items-center justify-center border-r border-slate-200 bg-slate-200 text-sm font-bold text-slate-700" style="width: ' + monthWidth + 'px; min-width: ' + monthWidth + 'px;">' +
+                    monthData.year + '年' + monthData.name +
+                    '</div>'
+                );
+
+                // 日付ヘッダー
+                monthData.days.forEach(function(day) {
+                    var cellClass = 'gantt-cell flex flex-col items-center justify-center border-r border-slate-200 text-xs';
+                    if (day.dayOfWeek === 0) cellClass += ' weekend-sun';
+                    else if (day.dayOfWeek === 6) cellClass += ' weekend-sat';
+
+                    if (day.dateObj.toDateString() === TODAY.toDateString()) {
+                        cellClass += ' today-marker';
+                    }
+
+                    $dateHeader.append(
+                        '<div class="' + cellClass + '">' +
+                        '<span class="font-bold">' + day.date + '</span>' +
+                        '<span class="text-slate-400 text-[10px]">' + weekDays[day.dayOfWeek] + '</span>' +
+                        '</div>'
+                    );
+                });
+            });
+        }
+
+        // ========================================
+        // タスクリスト生成
+        // ========================================
+        function generateTaskList() {
+            var $taskList = $('#task-list');
+            $taskList.empty();
+
+            var filteredMembers = selectedMember === 'all'
+                ? membersData
+                : membersData.filter(function(m) { return m.id == selectedMember; });
+
+            filteredMembers.forEach(function(member) {
+                var memberTasks = tasksData.filter(function(t) { return t.memberId === member.id; });
+                var monthlyWorkload = calculateMonthlyWorkload(member.id);
+                var workloadClass = getWorkloadClass(monthlyWorkload);
+
+                // 担当者ヘッダー行
+                var memberHeaderHtml =
+                    '<div class="flex items-center member-header-row border-b border-slate-300" data-member-id="' + member.id + '">' +
+                    '<div class="w-40 px-2 flex items-center">' +
+                    '<div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-xs font-bold mr-2">' +
+                    member.name.charAt(0) +
+                    '</div>' +
+                    '<div>' +
+                    '<div class="text-sm font-bold text-slate-800">' + member.name + '</div>' +
+                    '<div class="text-xs text-slate-500">' + member.department + '</div>' +
+                    '</div>' +
+                    '</div>' +
+                    '<div class="w-32 px-1 text-center border-l border-slate-200">' +
+                    '<span class="workload-indicator ' + workloadClass + '">' + Math.round(monthlyWorkload * 100) + '%</span>' +
+                    '</div>' +
+                    '<div class="w-16 px-1 text-xs text-slate-500 text-center border-l border-slate-200">' + memberTasks.length + '件</div>' +
+                    '<div class="w-16 px-1 border-l border-slate-200"></div>' +
+                    '<div class="w-12 px-1 border-l border-slate-200"></div>' +
+                    '</div>';
+
+                $taskList.append(memberHeaderHtml);
+
+                // タスク行
+                memberTasks.forEach(function(task) {
+                    var project = projectsData[task.projectId];
+                    var taskRowHtml =
+                        '<div class="flex items-center task-row border-b border-slate-100 hover:bg-slate-50" data-task-id="' + task.id + '">' +
+                        '<div class="w-40 px-2 pl-6">' +
+                        '<div class="text-xs font-medium text-slate-700 truncate" title="' + task.name + '">' + task.name + '</div>' +
+                        '</div>' +
+                        '<div class="w-32 px-1 border-l border-slate-100">' +
+                        '<div class="text-xs text-slate-600 truncate" title="' + project.name + '">' + project.name + '</div>' +
+                        '</div>' +
+                        '<div class="w-16 px-1 text-xs text-slate-500 text-center border-l border-slate-100">' + formatDateShort(task.planStart) + '</div>' +
+                        '<div class="w-16 px-1 text-xs text-slate-500 text-center border-l border-slate-100">' + formatDateShort(task.planEnd) + '</div>' +
+                        '<div class="w-12 px-1 text-xs text-center border-l border-slate-100">' +
+                        '<span class="' + getProgressColorClass(task.progress) + '">' + task.progress + '%</span>' +
+                        '</div>' +
+                        '</div>';
+
+                    $taskList.append(taskRowHtml);
+                });
+            });
+        }
+
+        // ========================================
+        // ガントチャート生成
+        // ========================================
+        function generateGanttChart() {
+            var $gantt = $('#gantt-chart');
+            $gantt.empty();
+
+            var totalDays = 0;
+            MONTHS_DATA.forEach(function(m) { totalDays += m.days.length; });
+
+            var filteredMembers = selectedMember === 'all'
+                ? membersData
+                : membersData.filter(function(m) { return m.id == selectedMember; });
+
+            filteredMembers.forEach(function(member) {
+                var memberTasks = tasksData.filter(function(t) { return t.memberId === member.id; });
+
+                // 担当者ヘッダー行（ガント側）
+                var memberGanttHtml = '<div class="flex member-header-row border-b border-slate-300" data-member-id="' + member.id + '">';
+                MONTHS_DATA.forEach(function(monthData) {
+                    monthData.days.forEach(function(day) {
+                        var cellClass = 'gantt-cell border-r border-slate-100';
+                        if (day.dayOfWeek === 0) cellClass += ' weekend-sun';
+                        else if (day.dayOfWeek === 6) cellClass += ' weekend-sat';
+                        memberGanttHtml += '<div class="' + cellClass + '"></div>';
+                    });
+                });
+                memberGanttHtml += '</div>';
+                $gantt.append(memberGanttHtml);
+
+                // タスク行（ガント側）
+                memberTasks.forEach(function(task) {
+                    var project = projectsData[task.projectId];
+                    var taskGanttHtml = '<div class="flex task-row border-b border-slate-100 relative" data-task-id="' + task.id + '">';
+
+                    MONTHS_DATA.forEach(function(monthData) {
+                        monthData.days.forEach(function(day) {
+                            var cellClass = 'gantt-cell border-r border-slate-100';
+                            if (day.dayOfWeek === 0) cellClass += ' weekend-sun';
+                            else if (day.dayOfWeek === 6) cellClass += ' weekend-sat';
+                            taskGanttHtml += '<div class="' + cellClass + '"></div>';
+                        });
+                    });
+
+                    taskGanttHtml += '</div>';
+                    var $row = $(taskGanttHtml);
+
+                    // タスクバーを追加
+                    var barInfo = calculateBarPosition(task.planStart, task.planEnd);
+                    if (barInfo) {
+                        var progressWidth = (barInfo.width * task.progress / 100);
+                        var $bar = $(
+                            '<div class="task-bar absolute flex items-center px-2 project-color-' + project.color + '" ' +
+                            'style="left: ' + barInfo.left + 'px; width: ' + barInfo.width + 'px; top: 6px;" ' +
+                            'title="' + task.name + ' (' + project.name + ')">' +
+                            '<span class="text-white text-xs font-medium">' + task.name + '</span>' +
+                            '</div>'
+                        );
+
+                        // 進捗バー
+                        if (task.progress > 0 && task.progress < 100) {
+                            $bar.append(
+                                '<div class="absolute left-0 top-0 bottom-0 bg-white/30 rounded-l" style="width: ' + progressWidth + 'px;"></div>'
+                            );
+                        }
+
+                        $row.append($bar);
+                    }
+
+                    $gantt.append($row);
+                });
+            });
+        }
+
+        // ========================================
+        // バー位置計算
+        // ========================================
+        function calculateBarPosition(startDateStr, endDateStr) {
+            var startDate = new Date(startDateStr);
+            var endDate = new Date(endDateStr);
+
+            var yearStart = new Date(currentYear, 0, 1);
+            var startDayIndex = Math.floor((startDate - yearStart) / (1000 * 60 * 60 * 24));
+            var endDayIndex = Math.floor((endDate - yearStart) / (1000 * 60 * 60 * 24));
+
+            // 範囲外チェック
+            var totalDays = 0;
+            MONTHS_DATA.forEach(function(m) { totalDays += m.days.length; });
+
+            if (endDayIndex < 0 || startDayIndex >= totalDays) {
+                return null;
+            }
+
+            startDayIndex = Math.max(0, startDayIndex);
+            endDayIndex = Math.min(totalDays - 1, endDayIndex);
+
+            var left = startDayIndex * 40;
+            var width = (endDayIndex - startDayIndex + 1) * 40;
+
+            return { left: left, width: width };
+        }
+
+        // ========================================
+        // 稼働率計算
+        // ========================================
+        function calculateMonthlyWorkload(memberId) {
+            var memberTasks = tasksData.filter(function(t) { return t.memberId === memberId; });
+            var currentMonthStart = new Date(currentYear, currentMonth, 1);
+            var currentMonthEnd = new Date(currentYear, currentMonth + 1, 0);
+
+            var workingDays = 0;
+            var totalWorkload = 0;
+
+            for (var d = new Date(currentMonthStart); d <= currentMonthEnd; d.setDate(d.getDate() + 1)) {
+                var dayOfWeek = d.getDay();
+                if (dayOfWeek === 0 || dayOfWeek === 6) continue;
+
+                workingDays++;
+                var dateStr = formatDate(d);
+                var dayWorkload = 0;
+
+                memberTasks.forEach(function(task) {
+                    if (dateStr >= task.planStart && dateStr <= task.planEnd) {
+                        dayWorkload += 1;
+                    }
+                });
+
+                totalWorkload += dayWorkload;
+            }
+
+            return workingDays > 0 ? totalWorkload / workingDays : 0;
+        }
+
+        // ========================================
+        // ユーティリティ
+        // ========================================
+        function formatDate(date) {
+            var year = date.getFullYear();
+            var month = ('0' + (date.getMonth() + 1)).slice(-2);
+            var day = ('0' + date.getDate()).slice(-2);
+            return year + '-' + month + '-' + day;
+        }
+
+        function formatDateShort(dateStr) {
+            var parts = dateStr.split('-');
+            return parseInt(parts[1]) + '/' + parseInt(parts[2]);
+        }
+
+        function getWorkloadClass(workload) {
+            if (workload < 0.7) return 'workload-low';
+            if (workload < 1.0) return 'workload-normal';
+            if (workload < 1.2) return 'workload-high';
+            return 'workload-over';
+        }
+
+        function getProgressColorClass(progress) {
+            if (progress === 100) return 'text-green-600 font-bold';
+            if (progress >= 50) return 'text-blue-600';
+            if (progress > 0) return 'text-amber-600';
+            return 'text-slate-400';
+        }
+
+        // ========================================
+        // スクロール
+        // ========================================
+        function setupScrollSync() {
+            var $taskListScroll = $('#task-list-scroll');
+            var $ganttScroll = $('#gantt-chart-scroll');
+            var $headerScroll = $('#gantt-header-scroll');
+
+            $taskListScroll.on('scroll', function() {
+                $ganttScroll.scrollTop($taskListScroll.scrollTop());
+            });
+
+            $ganttScroll.on('scroll', function() {
+                $taskListScroll.scrollTop($ganttScroll.scrollTop());
+                $headerScroll.scrollLeft($ganttScroll.scrollLeft());
+            });
+
+            $headerScroll.on('scroll', function() {
+                $ganttScroll.scrollLeft($headerScroll.scrollLeft());
+            });
+
+            // ドラッグスクロール機能
+            setupDragScroll($ganttScroll[0]);
+            setupDragScroll($headerScroll[0]);
+        }
+
+        // ドラッグスクロール
+        function setupDragScroll(element) {
+            var isDragging = false;
+            var startX, startY;
+            var scrollLeft, scrollTop;
+
+            $(element).on('mousedown', function(e) {
+                // タスクバー上でのドラッグは除外
+                if ($(e.target).closest('.task-bar').length) return;
+
+                isDragging = true;
+                $(element).addClass('cursor-grabbing');
+                startX = e.pageX - element.offsetLeft;
+                startY = e.pageY - element.offsetTop;
+                scrollLeft = element.scrollLeft;
+                scrollTop = element.scrollTop;
+                e.preventDefault();
+            });
+
+            $(document).on('mouseup', function() {
+                if (isDragging) {
+                    isDragging = false;
+                    $(element).removeClass('cursor-grabbing');
+                }
+            });
+
+            $(document).on('mousemove', function(e) {
+                if (!isDragging) return;
+
+                var x = e.pageX - element.offsetLeft;
+                var y = e.pageY - element.offsetTop;
+                var walkX = (x - startX) * 1.5;
+                var walkY = (y - startY) * 1.5;
+
+                element.scrollLeft = scrollLeft - walkX;
+                element.scrollTop = scrollTop - walkY;
+            });
+        }
+
+        function scrollToToday() {
+            // デモ用：2025年1月10日にスクロール
+            var demoToday = new Date(2025, 0, 10);
+            scrollToDate(demoToday);
+        }
+
+        function scrollToDate(targetDate) {
+            var yearStart = new Date(currentYear, 0, 1);
+            var dayIndex = Math.floor((targetDate - yearStart) / (1000 * 60 * 60 * 24));
+            var scrollPosition = Math.max(0, (dayIndex * 40) - 200);
+
+            $('#gantt-chart-scroll').animate({ scrollLeft: scrollPosition }, 300);
+            $('#gantt-header-scroll').animate({ scrollLeft: scrollPosition }, 300);
+        }
+
+        // ========================================
+        // サイドバー
+        // ========================================
+        function setupSidebar() {
+            var $sidebarModal = $('#sidebar-modal');
+            var $sidebarOverlay = $('#sidebar-overlay');
+            var $menuToggle = $('#menu-toggle');
+            var $closeSidebar = $('#close-sidebar');
+
+            $menuToggle.on('click', function() {
+                $sidebarModal.addClass('show');
+                $sidebarOverlay.addClass('show');
+            });
+
+            $closeSidebar.on('click', function() {
+                $sidebarModal.removeClass('show');
+                $sidebarOverlay.removeClass('show');
+            });
+
+            $sidebarOverlay.on('click', function() {
+                $sidebarModal.removeClass('show');
+                $sidebarOverlay.removeClass('show');
+            });
+        }
+
+        // ========================================
+        // ユーザーメニュー
+        // ========================================
+        function setupUserMenu() {
+            var $trigger = $('#user-menu-trigger');
+            var $dropdown = $('#user-menu-dropdown');
+            var $arrow = $('#user-menu-arrow');
+
+            $trigger.on('click', function(e) {
+                e.stopPropagation();
+                $dropdown.toggleClass('show');
+                $arrow.toggleClass('fa-chevron-up fa-chevron-down');
+            });
+
+            $(document).on('click', function() {
+                $dropdown.removeClass('show');
+                $arrow.removeClass('fa-chevron-up').addClass('fa-chevron-down');
+            });
+        }
+
+        function logout() {
+            if (confirm('ログアウトしますか？')) {
+                location.href = '../login.html';
+            }
+        }
+
+        // ========================================
+        // フッター更新
+        // ========================================
+        function updateFooter() {
+            var filteredMembers = selectedMember === 'all'
+                ? membersData
+                : membersData.filter(function(m) { return m.id == selectedMember; });
+
+            var taskCount = 0;
+            filteredMembers.forEach(function(member) {
+                taskCount += tasksData.filter(function(t) { return t.memberId === member.id; }).length;
+            });
+
+            $('#member-count').text(filteredMembers.length);
+            $('#task-count').text(taskCount);
+            $('#display-period').text(currentYear + '年');
+        }
+
+        function updateTodayDisplay() {
+            var monthNames = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+            $('#today-display').text(TODAY.getFullYear() + '年' + monthNames[TODAY.getMonth()] + TODAY.getDate() + '日');
+        }
+    </script>
+</body>
+</html>

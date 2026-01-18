@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ダッシュボード - プロジェクト管理システム</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .sidebar-gradient {
+      background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+    }
+
+    .card-shadow {
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+    }
+
+    .card-shadow-lg {
+      box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+      transition: all 0.3s ease;
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+    }
+
+    /* メニューカード */
+    .menu-card {
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .menu-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.15);
+    }
+
+    .stat-card {
+      transition: all 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    .fade-in {
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .progress-ring {
+      transform: rotate(-90deg);
+    }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+  <div class="flex h-screen overflow-hidden">
+    <!-- メインコンテンツ -->
+    <div class="flex-1 flex flex-col overflow-hidden">
+      <!-- ヘッダー -->
+      <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50">
+        <div class="flex items-center justify-between px-8 py-3">
+          <div class="flex items-center space-x-3">
+            <div
+              class="w-9 h-9 rounded-lg bg-gradient-to-br from-slate-800 to-slate-900 flex items-center justify-center shadow-md">
+              <i class="fas fa-project-diagram text-blue-400 text-sm"></i>
+            </div>
+            <span
+              class="text-lg font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">PM
+              System</span>
+          </div>
+          <div class="flex items-center space-x-4">
+            <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <i class="fas fa-calendar text-slate-400 text-xs"></i>
+              <span class="text-xs font-medium text-slate-700">2024年4月10日</span>
+            </div>
+            <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+              <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+              <span class="text-sm font-medium text-slate-700">山田太郎</span>
+              <i class="fas fa-chevron-down text-slate-400 text-xs ml-1"></i>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- メインコンテンツエリア -->
+      <main class="flex-1 overflow-y-auto p-8">
+        <!-- メニューカード -->
+        <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4 mb-8">
+          <a href="customers/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-building text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">顧客</span>
+          </a>
+          <a href="projects/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-folder text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">プロジェクト</span>
+          </a>
+          <a href="schedule/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-calendar-alt text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">スケジュール</span>
+          </a>
+          <a href="tasks/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-tasks text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">タスク一覧</span>
+          </a>
+          <a href="members/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-users text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">メンバー</span>
+          </a>
+          <a href="#" class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-yen-sign text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">原価管理</span>
+          </a>
+          <a href="reports/index.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-chart-bar text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">レポート</span>
+          </a>
+          <a href="settings.html"
+            class="menu-card bg-white rounded-xl p-4 card-shadow flex flex-col items-center text-center">
+            <div
+              class="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-500 to-slate-700 flex items-center justify-center shadow-lg mb-3">
+              <i class="fas fa-cog text-white"></i>
+            </div>
+            <span class="text-sm font-semibold text-slate-700">設定</span>
+          </a>
+        </div>
+        <!-- 統計カード -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <!-- プロジェクト数 -->
+          <div class="stat-card bg-white rounded-2xl p-6 card-shadow fade-in">
+            <div class="flex items-center justify-between mb-4">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-folder text-white"></i>
+              </div>
+              <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+12%</span>
+            </div>
+            <div class="mb-2">
+              <p class="text-3xl font-bold text-slate-800">24</p>
+              <p class="text-sm text-slate-500 font-medium">アクティブなプロジェクト</p>
+            </div>
+            <div class="flex items-center text-xs text-slate-400">
+              <i class="fas fa-arrow-up mr-1"></i>
+              <span>先月比 +3</span>
+            </div>
+          </div>
+
+          <!-- タスク数 -->
+          <div class="stat-card bg-white rounded-2xl p-6 card-shadow fade-in">
+            <div class="flex items-center justify-between mb-4">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-tasks text-white"></i>
+              </div>
+              <span class="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-1 rounded-lg">進行中</span>
+            </div>
+            <div class="mb-2">
+              <p class="text-3xl font-bold text-slate-800">156</p>
+              <p class="text-sm text-slate-500 font-medium">未完了タスク</p>
+            </div>
+            <div class="flex items-center text-xs text-slate-400">
+              <i class="fas fa-clock mr-1"></i>
+              <span>今週完了予定: 42</span>
+            </div>
+          </div>
+
+          <!-- メンバー数 -->
+          <div class="stat-card bg-white rounded-2xl p-6 card-shadow fade-in">
+            <div class="flex items-center justify-between mb-4">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-users text-white"></i>
+              </div>
+              <span class="text-xs font-semibold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">+2</span>
+            </div>
+            <div class="mb-2">
+              <p class="text-3xl font-bold text-slate-800">18</p>
+              <p class="text-sm text-slate-500 font-medium">チームメンバー</p>
+            </div>
+            <div class="flex items-center text-xs text-slate-400">
+              <i class="fas fa-user-check mr-1"></i>
+              <span>オンライン: 12</span>
+            </div>
+          </div>
+
+          <!-- 進捗率 -->
+          <div class="stat-card bg-white rounded-2xl p-6 card-shadow fade-in">
+            <div class="flex items-center justify-between mb-4">
+              <div
+                class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+                <i class="fas fa-chart-line text-white"></i>
+              </div>
+              <span class="text-xs font-semibold text-amber-600 bg-amber-50 px-2 py-1 rounded-lg">良好</span>
+            </div>
+            <div class="mb-2">
+              <p class="text-3xl font-bold text-slate-800">68%</p>
+              <p class="text-sm text-slate-500 font-medium">全体進捗率</p>
+            </div>
+            <div class="flex items-center text-xs text-slate-400">
+              <i class="fas fa-trending-up mr-1"></i>
+              <span>先月比 +5%</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- グラフとプロジェクト一覧 -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          <!-- 進捗グラフ -->
+          <div class="lg:col-span-2 bg-white rounded-2xl p-6 card-shadow fade-in">
+            <div class="flex items-center justify-between mb-6">
+              <h3 class="text-lg font-bold text-slate-800">プロジェクト進捗状況</h3>
+              <select
+                class="text-xs border border-slate-200 rounded-lg px-3 py-1.5 bg-white focus:ring-2 focus:ring-blue-500">
+                <option>過去30日</option>
+                <option>過去7日</option>
+                <option>過去90日</option>
+              </select>
+            </div>
+            <div class="relative h-64">
+              <canvas id="progressChart"></canvas>
+            </div>
+          </div>
+
+          <!-- 最近の活動 -->
+          <div class="bg-white rounded-2xl p-6 card-shadow fade-in">
+            <h3 class="text-lg font-bold text-slate-800 mb-6">最近の活動</h3>
+            <div class="space-y-4">
+              <div class="flex items-start space-x-3 pb-4 border-b border-slate-100">
+                <div
+                  class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-check text-white text-xs"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-slate-800">タスク完了</p>
+                  <p class="text-xs text-slate-500">山田さんが「要件書作成」を完了</p>
+                  <p class="text-xs text-slate-400 mt-1">2時間前</p>
+                </div>
+              </div>
+              <div class="flex items-start space-x-3 pb-4 border-b border-slate-100">
+                <div
+                  class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-comment text-white text-xs"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-slate-800">コメント追加</p>
+                  <p class="text-xs text-slate-500">佐藤さんが「ECサイトリニューアル」にコメント</p>
+                  <p class="text-xs text-slate-400 mt-1">5時間前</p>
+                </div>
+              </div>
+              <div class="flex items-start space-x-3 pb-4 border-b border-slate-100">
+                <div
+                  class="w-8 h-8 rounded-full bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-user-plus text-white text-xs"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-slate-800">メンバー追加</p>
+                  <p class="text-xs text-slate-500">新メンバー「高橋さん」が追加されました</p>
+                  <p class="text-xs text-slate-400 mt-1">1日前</p>
+                </div>
+              </div>
+              <div class="flex items-start space-x-3">
+                <div
+                  class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center flex-shrink-0">
+                  <i class="fas fa-file text-white text-xs"></i>
+                </div>
+                <div class="flex-1">
+                  <p class="text-sm font-medium text-slate-800">ファイルアップロード</p>
+                  <p class="text-xs text-slate-500">鈴木さんが「設計書.pdf」をアップロード</p>
+                  <p class="text-xs text-slate-400 mt-1">2日前</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- プロジェクト一覧 -->
+        <div class="bg-white rounded-2xl p-6 card-shadow fade-in">
+          <div class="flex items-center justify-between mb-6">
+            <h3 class="text-lg font-bold text-slate-800">進行中のプロジェクト</h3>
+            <a href="projects/index.html"
+              class="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center">
+              すべて見る <i class="fas fa-arrow-right ml-1 text-xs"></i>
+            </a>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full">
+              <thead>
+                <tr class="border-b border-slate-200">
+                  <th class="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wide">プロジェクト名
+                  </th>
+                  <th class="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wide">担当者</th>
+                  <th class="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wide">進捗</th>
+                  <th class="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wide">期限</th>
+                  <th class="text-left py-3 px-4 text-xs font-semibold text-slate-600 uppercase tracking-wide">ステータス
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-100">
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-3">
+                      <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center">
+                        <i class="fas fa-shopping-cart text-white text-sm"></i>
+                      </div>
+                      <div>
+                        <p class="text-sm font-semibold text-slate-800">ECサイトリニューアル</p>
+                        <p class="text-xs text-slate-500">12タスク</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white">
+                      </div>
+                      <span class="text-sm text-slate-700">山田</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="flex-1 w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div class="bg-gradient-to-r from-blue-500 to-indigo-500 h-2 rounded-full" style="width: 75%">
+                        </div>
+                      </div>
+                      <span class="text-sm font-semibold text-blue-600">75%</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="text-sm text-slate-700">2024/05/15</span>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700">進行中</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-3">
+                      <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 flex items-center justify-center">
+                        <i class="fas fa-building text-white text-sm"></i>
+                      </div>
+                      <div>
+                        <p class="text-sm font-semibold text-slate-800">社内業務システム開発</p>
+                        <p class="text-xs text-slate-500">28タスク</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-pink-500 ring-2 ring-white">
+                      </div>
+                      <span class="text-sm text-slate-700">佐藤</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="flex-1 w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div class="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full" style="width: 45%">
+                        </div>
+                      </div>
+                      <span class="text-sm font-semibold text-purple-600">45%</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="text-sm text-slate-700">2024/06/30</span>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-lg bg-purple-50 text-purple-700">進行中</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-3">
+                      <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
+                        <i class="fas fa-mobile-alt text-white text-sm"></i>
+                      </div>
+                      <div>
+                        <p class="text-sm font-semibold text-slate-800">モバイルアプリ開発</p>
+                        <p class="text-xs text-slate-500">35タスク</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 ring-2 ring-white">
+                      </div>
+                      <span class="text-sm text-slate-700">鈴木</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="flex-1 w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div class="bg-gradient-to-r from-emerald-500 to-teal-500 h-2 rounded-full" style="width: 60%">
+                        </div>
+                      </div>
+                      <span class="text-sm font-semibold text-emerald-600">60%</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="text-sm text-slate-700">2024/07/20</span>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-lg bg-emerald-50 text-emerald-700">進行中</span>
+                  </td>
+                </tr>
+                <tr class="hover:bg-slate-50 transition-colors">
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-3">
+                      <div
+                        class="w-10 h-10 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center">
+                        <i class="fas fa-chart-bar text-white text-sm"></i>
+                      </div>
+                      <div>
+                        <p class="text-sm font-semibold text-slate-800">データ分析プラットフォーム</p>
+                        <p class="text-xs text-slate-500">18タスク</p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="w-6 h-6 rounded-full bg-gradient-to-br from-orange-400 to-red-500 ring-2 ring-white">
+                      </div>
+                      <span class="text-sm text-slate-700">田中</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <div class="flex items-center space-x-2">
+                      <div class="flex-1 w-24 bg-slate-200 rounded-full h-2 overflow-hidden">
+                        <div class="bg-gradient-to-r from-amber-500 to-orange-500 h-2 rounded-full" style="width: 30%">
+                        </div>
+                      </div>
+                      <span class="text-sm font-semibold text-amber-600">30%</span>
+                    </div>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="text-sm text-slate-700">2024/08/10</span>
+                  </td>
+                  <td class="py-4 px-4">
+                    <span class="px-2 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-700">計画中</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    // 進捗グラフ
+    const ctx = document.getElementById('progressChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: ['1月', '2月', '3月', '4月', '5月', '6月'],
+        datasets: [{
+          label: '完了タスク数',
+          data: [12, 19, 15, 25, 22, 30],
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.4,
+          fill: true,
+          borderWidth: 3,
+          pointRadius: 5,
+          pointBackgroundColor: 'rgb(59, 130, 246)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2
+        }, {
+          label: '総タスク数',
+          data: [20, 25, 28, 35, 40, 45],
+          borderColor: 'rgb(139, 92, 246)',
+          backgroundColor: 'rgba(139, 92, 246, 0.1)',
+          tension: 0.4,
+          fill: true,
+          borderWidth: 3,
+          pointRadius: 5,
+          pointBackgroundColor: 'rgb(139, 92, 246)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: true,
+        aspectRatio: 2,
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            labels: {
+              usePointStyle: true,
+              padding: 15,
+              font: {
+                size: 12,
+                weight: '500'
+              }
+            }
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: {
+              color: 'rgba(148, 163, 184, 0.1)'
+            },
+            ticks: {
+              font: {
+                size: 11
+              }
+            }
+          },
+          x: {
+            grid: {
+              display: false
+            },
+            ticks: {
+              font: {
+                size: 11
+              }
+            }
+          }
+        }
+      }
+    });
+  </script>
+</body>
+
+</html>

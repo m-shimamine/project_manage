@@ -1,0 +1,1037 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>レポート編集 - プロジェクト管理システム</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        * {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .sidebar-gradient {
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+        }
+        .card-shadow {
+            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+        }
+        .card-shadow-lg {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.4);
+        }
+        .nav-item {
+            transition: all 0.2s ease;
+            border-radius: 8px;
+            margin: 2px 8px;
+        }
+        .nav-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
+        }
+        .nav-item.active {
+            background: rgba(59, 130, 246, 0.15);
+            border-left: 3px solid #3b82f6;
+        }
+        /* サイドメニューモーダル */
+        .sidebar-modal {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 280px;
+            height: 100vh;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            z-index: 200;
+            display: none;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.3);
+        }
+        .sidebar-modal.show {
+            display: block;
+        }
+        .sidebar-modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 199;
+            display: none;
+        }
+        .sidebar-modal-overlay.show {
+            display: block;
+        }
+        .sidebar-modal .nav-item {
+            margin: 4px 12px;
+            padding: 12px 16px;
+        }
+        .sidebar-modal .nav-item:hover {
+            background: rgba(59, 130, 246, 0.15);
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        /* ユーザーメニュー */
+        .user-menu-container {
+            position: relative;
+        }
+        .user-menu-trigger {
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .user-menu-trigger:hover {
+            background: #f8fafc;
+        }
+        .user-menu-dropdown {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 8px;
+            background: white;
+            border: 1px solid #e2e8f0;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+            z-index: 9999;
+            min-width: 240px;
+            padding: 0;
+            display: none;
+            overflow: hidden;
+        }
+        .user-menu-dropdown.show {
+            display: block;
+            animation: fadeInDown 0.2s ease;
+        }
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .user-menu-header {
+            padding: 16px;
+            background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+            border-bottom: 1px solid #e2e8f0;
+        }
+        .user-menu-item {
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            color: #475569;
+            font-size: 14px;
+        }
+        .user-menu-item:hover {
+            background: #f8fafc;
+        }
+        .user-menu-item i {
+            width: 20px;
+            margin-right: 12px;
+            color: #94a3b8;
+        }
+        .user-menu-item.logout {
+            color: #dc2626;
+            border-top: 1px solid #e2e8f0;
+        }
+        .user-menu-item.logout i {
+            color: #dc2626;
+        }
+        .user-menu-item.logout:hover {
+            background: #fef2f2;
+        }
+
+        /* ステータスバッジ */
+        .status-draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+        .status-submitted {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        /* タスク情報テーブル */
+        .task-info-table th {
+            background: #f8fafc;
+            font-weight: 600;
+            font-size: 12px;
+            color: #64748b;
+            text-transform: uppercase;
+        }
+        .task-info-table td {
+            font-size: 13px;
+        }
+
+        /* Markdown プレビュー */
+        .markdown-preview h1 { font-size: 1.5rem; font-weight: 700; margin: 1rem 0 0.5rem; }
+        .markdown-preview h2 { font-size: 1.25rem; font-weight: 600; margin: 1rem 0 0.5rem; }
+        .markdown-preview h3 { font-size: 1.1rem; font-weight: 600; margin: 0.75rem 0 0.5rem; }
+        .markdown-preview p { margin: 0.5rem 0; }
+        .markdown-preview ul { list-style: disc; margin-left: 1.5rem; }
+        .markdown-preview ol { list-style: decimal; margin-left: 1.5rem; }
+        .markdown-preview li { margin: 0.25rem 0; }
+        .markdown-preview code { background: #f1f5f9; padding: 0.125rem 0.25rem; border-radius: 4px; font-size: 0.875rem; }
+        .markdown-preview pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 8px; overflow-x: auto; }
+        .markdown-preview pre code { background: transparent; padding: 0; }
+        .markdown-preview blockquote { border-left: 4px solid #3b82f6; padding-left: 1rem; margin: 0.5rem 0; color: #64748b; }
+        .markdown-preview table { width: 100%; border-collapse: collapse; margin: 0.5rem 0; }
+        .markdown-preview th, .markdown-preview td { border: 1px solid #e2e8f0; padding: 0.5rem; text-align: left; }
+        .markdown-preview th { background: #f8fafc; }
+
+        /* 最大化モード */
+        .fullscreen-mode {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            right: 0 !important;
+            bottom: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            z-index: 9999 !important;
+            background: white !important;
+            border-radius: 0 !important;
+            margin: 0 !important;
+            padding: 20px !important;
+        }
+        .fullscreen-mode textarea,
+        .fullscreen-mode .markdown-preview {
+            height: calc(100vh - 80px) !important;
+            max-height: none !important;
+        }
+
+        /* パネルリサイズ */
+        .resizable-panel {
+            transition: height 0.2s ease;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+    <!-- サイドバーモーダル -->
+    <div class="sidebar-modal-overlay" id="sidebar-overlay"></div>
+    <aside class="sidebar-modal" id="sidebar-modal">
+        <div class="p-4 border-b border-slate-700/50 flex items-center justify-between">
+            <a href="../dashboard.html" class="flex items-center">
+                <i class="fas fa-project-diagram text-blue-400 mr-3 text-lg"></i>
+                <span class="text-lg font-bold text-white">PM System</span>
+            </a>
+            <button id="sidebar-close" class="p-1.5 hover:bg-slate-700 rounded text-slate-400">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <nav class="mt-4">
+            <a href="../dashboard.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-tachometer-alt w-5 mr-3 text-slate-400"></i><span>ダッシュボード</span>
+            </a>
+            <a href="../customers/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-building w-5 mr-3 text-slate-400"></i><span>顧客</span>
+            </a>
+            <a href="../projects/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-folder w-5 mr-3 text-slate-400"></i><span>プロジェクト</span>
+            </a>
+            <a href="../schedule/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-calendar-alt w-5 mr-3 text-slate-400"></i><span>スケジュール</span>
+            </a>
+            <a href="../members/index.html" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-users w-5 mr-3 text-slate-400"></i><span>メンバー</span>
+            </a>
+            <a href="#" class="nav-item flex items-center px-4 py-3 text-slate-300 hover:text-white">
+                <i class="fas fa-yen-sign w-5 mr-3 text-slate-400"></i><span>原価管理</span>
+            </a>
+            <a href="index.html" class="nav-item active flex items-center px-4 py-3 text-white">
+                <i class="fas fa-chart-bar w-5 mr-3 text-blue-400"></i><span>レポート</span>
+            </a>
+        </nav>
+    </aside>
+
+    <div class="flex h-screen overflow-hidden">
+        <!-- メインコンテンツ -->
+        <div class="flex-1 flex flex-col overflow-hidden">
+            <!-- ヘッダー -->
+            <header class="bg-white/80 backdrop-blur-lg card-shadow border-b border-slate-200/50 relative z-50">
+                <div class="flex items-center justify-between px-8 py-3">
+                    <div class="flex items-center space-x-4">
+                        <button id="menu-toggle" class="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                            <i class="fas fa-bars text-slate-600"></i>
+                        </button>
+                        <a href="../dashboard.html" class="flex items-center space-x-2">
+                            <i class="fas fa-project-diagram text-blue-500"></i>
+                            <span class="font-bold text-slate-800">PM System</span>
+                        </a>
+                        <div class="h-6 w-px bg-slate-200"></div>
+                        <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-rose-500 to-pink-600 flex items-center justify-center shadow-md">
+                            <i class="fas fa-edit text-white text-xs"></i>
+                        </div>
+                        <div>
+                            <h2 class="text-xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">レポート編集</h2>
+                            <p class="text-xs text-slate-500">第15週 週次レポート</p>
+                        </div>
+                        <span class="px-2 py-0.5 rounded-full text-xs font-medium status-draft ml-2">下書き</span>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                            <i class="fas fa-calendar text-slate-400 text-xs"></i>
+                            <span class="text-xs font-medium text-slate-700" id="today-date">2024年4月10日</span>
+                        </div>
+                        <!-- ユーザーメニュー -->
+                        <div class="user-menu-container">
+                            <div id="user-menu-trigger" class="user-menu-trigger flex items-center space-x-2 px-3 py-1.5 bg-white rounded-lg border border-slate-200 shadow-sm">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 ring-2 ring-white"></div>
+                                <span class="text-sm font-medium text-slate-700">山田太郎</span>
+                                <i class="fas fa-chevron-down text-slate-400 text-xs ml-1" id="user-menu-arrow"></i>
+                            </div>
+                            <div id="user-menu-dropdown" class="user-menu-dropdown">
+                                <div class="user-menu-header">
+                                    <div class="flex items-center space-x-3">
+                                        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold">
+                                            山
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-slate-800">山田太郎</div>
+                                            <div class="text-xs text-slate-500">yamada@example.com</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-user"></i>
+                                    <span>プロフィール</span>
+                                </div>
+                                <div class="user-menu-item" onclick="location.href='#'">
+                                    <i class="fas fa-cog"></i>
+                                    <span>設定</span>
+                                </div>
+                                <div class="user-menu-item logout" onclick="logout()">
+                                    <i class="fas fa-sign-out-alt"></i>
+                                    <span>ログアウト</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- メインエリア -->
+            <main class="flex-1 overflow-y-auto p-6">
+                <div class="max-w-7xl mx-auto">
+                    <!-- 週選択 -->
+                    <div class="bg-white rounded-xl card-shadow border border-slate-100 p-4 mb-6">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <label class="text-sm font-semibold text-slate-700">レポート対象期間</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="date" id="start-date" value="2024-04-04" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                    <span class="text-slate-400">〜</span>
+                                    <input type="date" id="end-date" value="2024-04-10" class="border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                                </div>
+                                <button onclick="setThisWeek()" class="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-sm font-medium transition-colors">
+                                    今週
+                                </button>
+                            </div>
+                            <div class="flex items-center space-x-3">
+                                <button onclick="saveDraft()" class="px-4 py-2 bg-slate-200 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-300 transition-colors">
+                                    <i class="fas fa-save mr-1.5"></i>下書き保存
+                                </button>
+                                <button onclick="submitReport()" class="btn-primary px-4 py-2 text-white rounded-lg text-sm font-medium">
+                                    <i class="fas fa-paper-plane mr-1.5"></i>提出
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- タスク情報（AI用） -->
+                    <div class="bg-white rounded-xl card-shadow border border-slate-100 p-4 mb-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-semibold text-slate-700 flex items-center">
+                                <i class="fas fa-tasks text-blue-500 mr-2"></i>全プロジェクト タスク情報（AI処理用）
+                            </h3>
+                            <button onclick="copyTaskInfo()" class="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-medium transition-colors flex items-center">
+                                <i class="fas fa-copy mr-1.5"></i>コピー
+                            </button>
+                        </div>
+                        <div class="overflow-x-auto max-h-96 overflow-y-auto" id="task-info-container">
+                            <!-- 株式会社ABC商事 -->
+                            <div class="mb-4">
+                                <div class="flex items-center space-x-2 mb-2 sticky top-0 bg-white py-1">
+                                    <div class="w-6 h-6 rounded bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                                        <i class="fas fa-building text-white text-xs"></i>
+                                    </div>
+                                    <span class="font-semibold text-slate-800 text-sm">株式会社ABC商事</span>
+                                </div>
+
+                                <!-- ECサイトリニューアル -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">ECサイトリニューアル</span>
+                                        <span class="text-xs text-slate-500">（進捗: 35%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">要件定義</td>
+                                                <td class="px-2 py-1.5 text-xs">山田太郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/05</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/05</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-emerald-600 font-semibold">100%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs">完了</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">基本設計</td>
+                                                <td class="px-2 py-1.5 text-xs">佐藤花子</td>
+                                                <td class="px-2 py-1.5 text-xs">04/06</td>
+                                                <td class="px-2 py-1.5 text-xs">04/12</td>
+                                                <td class="px-2 py-1.5 text-xs">04/06</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">60%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">詳細設計</td>
+                                                <td class="px-2 py-1.5 text-xs">鈴木一郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/10</td>
+                                                <td class="px-2 py-1.5 text-xs">04/20</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">フロントエンド開発</td>
+                                                <td class="px-2 py-1.5 text-xs">田中美咲</td>
+                                                <td class="px-2 py-1.5 text-xs">04/15</td>
+                                                <td class="px-2 py-1.5 text-xs">05/10</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- 基幹システム更新 -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">基幹システム更新</span>
+                                        <span class="text-xs text-slate-500">（進捗: 20%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">現状分析</td>
+                                                <td class="px-2 py-1.5 text-xs">高橋健太</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/10</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">80%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">システム設計</td>
+                                                <td class="px-2 py-1.5 text-xs">山田太郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/11</td>
+                                                <td class="px-2 py-1.5 text-xs">04/25</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- XYZ株式会社 -->
+                            <div class="mb-4">
+                                <div class="flex items-center space-x-2 mb-2 sticky top-0 bg-white py-1">
+                                    <div class="w-6 h-6 rounded bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                                        <i class="fas fa-building text-white text-xs"></i>
+                                    </div>
+                                    <span class="font-semibold text-slate-800 text-sm">XYZ株式会社</span>
+                                </div>
+
+                                <!-- 社内業務システム開発 -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">社内業務システム開発</span>
+                                        <span class="text-xs text-slate-500">（進捗: 45%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">DB設計</td>
+                                                <td class="px-2 py-1.5 text-xs">佐藤花子</td>
+                                                <td class="px-2 py-1.5 text-xs">03/25</td>
+                                                <td class="px-2 py-1.5 text-xs">04/05</td>
+                                                <td class="px-2 py-1.5 text-xs">03/25</td>
+                                                <td class="px-2 py-1.5 text-xs">04/05</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-emerald-600 font-semibold">100%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs">完了</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">API開発</td>
+                                                <td class="px-2 py-1.5 text-xs">鈴木一郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/06</td>
+                                                <td class="px-2 py-1.5 text-xs">04/20</td>
+                                                <td class="px-2 py-1.5 text-xs">04/06</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">40%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">画面開発</td>
+                                                <td class="px-2 py-1.5 text-xs">田中美咲</td>
+                                                <td class="px-2 py-1.5 text-xs">04/15</td>
+                                                <td class="px-2 py-1.5 text-xs">05/05</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- 勤怠管理システム -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">勤怠管理システム</span>
+                                        <span class="text-xs text-slate-500">（進捗: 70%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">テスト実施</td>
+                                                <td class="px-2 py-1.5 text-xs">高橋健太</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/15</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">70%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">本番リリース</td>
+                                                <td class="px-2 py-1.5 text-xs">山田太郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/16</td>
+                                                <td class="px-2 py-1.5 text-xs">04/20</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- 株式会社テックソリューション -->
+                            <div class="mb-4">
+                                <div class="flex items-center space-x-2 mb-2 sticky top-0 bg-white py-1">
+                                    <div class="w-6 h-6 rounded bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                                        <i class="fas fa-building text-white text-xs"></i>
+                                    </div>
+                                    <span class="font-semibold text-slate-800 text-sm">株式会社テックソリューション</span>
+                                </div>
+
+                                <!-- モバイルアプリ開発 -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">モバイルアプリ開発</span>
+                                        <span class="text-xs text-slate-500">（進捗: 15%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">UI/UXデザイン</td>
+                                                <td class="px-2 py-1.5 text-xs">田中美咲</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/15</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">50%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">iOS開発</td>
+                                                <td class="px-2 py-1.5 text-xs">佐藤花子</td>
+                                                <td class="px-2 py-1.5 text-xs">04/16</td>
+                                                <td class="px-2 py-1.5 text-xs">05/30</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">Android開発</td>
+                                                <td class="px-2 py-1.5 text-xs">鈴木一郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/16</td>
+                                                <td class="px-2 py-1.5 text-xs">05/30</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <!-- グローバルトレード株式会社 -->
+                            <div class="mb-4">
+                                <div class="flex items-center space-x-2 mb-2 sticky top-0 bg-white py-1">
+                                    <div class="w-6 h-6 rounded bg-gradient-to-br from-violet-400 to-purple-500 flex items-center justify-center">
+                                        <i class="fas fa-building text-white text-xs"></i>
+                                    </div>
+                                    <span class="font-semibold text-slate-800 text-sm">グローバルトレード株式会社</span>
+                                </div>
+
+                                <!-- 在庫管理システム -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">在庫管理システム</span>
+                                        <span class="text-xs text-slate-500">（進捗: 60%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">機能実装</td>
+                                                <td class="px-2 py-1.5 text-xs">高橋健太</td>
+                                                <td class="px-2 py-1.5 text-xs">03/20</td>
+                                                <td class="px-2 py-1.5 text-xs">04/10</td>
+                                                <td class="px-2 py-1.5 text-xs">03/20</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">80%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">結合テスト</td>
+                                                <td class="px-2 py-1.5 text-xs">山田太郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/11</td>
+                                                <td class="px-2 py-1.5 text-xs">04/25</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- 受発注システム改修 -->
+                                <div class="ml-4 mb-3">
+                                    <div class="flex items-center space-x-2 mb-1">
+                                        <i class="fas fa-folder text-blue-500 text-xs"></i>
+                                        <span class="font-medium text-slate-700 text-sm">受発注システム改修</span>
+                                        <span class="text-xs text-slate-500">（進捗: 25%）</span>
+                                    </div>
+                                    <table class="task-info-table w-full text-left ml-2">
+                                        <thead>
+                                            <tr>
+                                                <th class="px-2 py-1.5 text-xs">タスク名</th>
+                                                <th class="px-2 py-1.5 text-xs">担当者</th>
+                                                <th class="px-2 py-1.5 text-xs">予定開始</th>
+                                                <th class="px-2 py-1.5 text-xs">予定終了</th>
+                                                <th class="px-2 py-1.5 text-xs">実績開始</th>
+                                                <th class="px-2 py-1.5 text-xs">実績終了</th>
+                                                <th class="px-2 py-1.5 text-xs">進捗率</th>
+                                                <th class="px-2 py-1.5 text-xs">ステータス</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">要件ヒアリング</td>
+                                                <td class="px-2 py-1.5 text-xs">佐藤花子</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/08</td>
+                                                <td class="px-2 py-1.5 text-xs">04/01</td>
+                                                <td class="px-2 py-1.5 text-xs">04/08</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-emerald-600 font-semibold">100%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-full text-xs">完了</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">改修設計</td>
+                                                <td class="px-2 py-1.5 text-xs">鈴木一郎</td>
+                                                <td class="px-2 py-1.5 text-xs">04/09</td>
+                                                <td class="px-2 py-1.5 text-xs">04/18</td>
+                                                <td class="px-2 py-1.5 text-xs">04/09</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-blue-600 font-semibold">30%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">進行中</span></td>
+                                            </tr>
+                                            <tr class="border-t border-slate-100">
+                                                <td class="px-2 py-1.5 text-xs font-medium">改修実装</td>
+                                                <td class="px-2 py-1.5 text-xs">田中美咲</td>
+                                                <td class="px-2 py-1.5 text-xs">04/19</td>
+                                                <td class="px-2 py-1.5 text-xs">05/10</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs">-</td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="text-slate-500 font-semibold">0%</span></td>
+                                                <td class="px-2 py-1.5 text-xs"><span class="px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded-full text-xs">未着手</span></td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-2"><i class="fas fa-info-circle mr-1"></i>上記のタスク情報をAIに渡して、週次レポートの本文を生成できます</p>
+                    </div>
+
+                    <!-- レポート本文 -->
+                    <div class="grid grid-cols-2 gap-6">
+                        <!-- 編集エリア -->
+                        <div id="edit-panel" class="bg-white rounded-xl card-shadow border border-slate-100 overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                                <h3 class="text-sm font-semibold text-slate-700 flex items-center">
+                                    <i class="fas fa-edit text-amber-500 mr-2"></i>マークダウン編集
+                                </h3>
+                                <button onclick="toggleFullscreen('edit')" class="p-1.5 hover:bg-slate-200 rounded-lg transition-colors" title="最大化">
+                                    <i class="fas fa-expand text-slate-500 text-sm"></i>
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <textarea id="markdown-input" class="w-full h-96 border border-slate-200 rounded-lg px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" placeholder="マークダウン形式でレポートを入力してください..." oninput="updatePreview()">## 今週の進捗
+
+- **要件定義**が予定通り完了しました（担当：山田太郎）
+- **基本設計**を進行中です。現在の進捗は60%で、4/12完了予定です（担当：佐藤花子）
+
+## タスク別進捗状況
+
+| タスク | 担当 | 進捗 | 状態 |
+|--------|------|------|------|
+| 要件定義 | 山田太郎 | 100% | 完了 |
+| 基本設計 | 佐藤花子 | 60% | 進行中 |
+| 詳細設計 | 鈴木一郎 | 0% | 未着手 |
+
+## 課題・リスク
+
+- 現時点で大きな課題・リスクはありません
+
+## 来週の予定
+
+- 基本設計の完了（4/12予定）
+- 詳細設計の着手
+- フロントエンド開発の準備</textarea>
+                            </div>
+                        </div>
+
+                        <!-- プレビューエリア -->
+                        <div id="preview-panel" class="bg-white rounded-xl card-shadow border border-slate-100 overflow-hidden">
+                            <div class="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                                <h3 class="text-sm font-semibold text-slate-700 flex items-center">
+                                    <i class="fas fa-eye text-blue-500 mr-2"></i>HTMLプレビュー
+                                </h3>
+                                <button onclick="toggleFullscreen('preview')" class="p-1.5 hover:bg-slate-200 rounded-lg transition-colors" title="最大化">
+                                    <i class="fas fa-expand text-slate-500 text-sm"></i>
+                                </button>
+                            </div>
+                            <div class="p-4">
+                                <div id="markdown-preview" class="markdown-preview h-96 overflow-auto border border-slate-200 rounded-lg px-4 py-3 bg-white">
+                                    <!-- プレビューがここに表示されます -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <!-- 最大化モーダル -->
+    <div id="fullscreen-modal" class="fixed inset-0 z-50 hidden bg-white">
+        <div class="h-full flex flex-col">
+            <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200 bg-slate-50">
+                <h3 id="fullscreen-title" class="text-lg font-semibold text-slate-800 flex items-center">
+                    <i class="fas fa-edit text-amber-500 mr-2"></i>マークダウン編集
+                </h3>
+                <button onclick="closeFullscreen()" class="p-2 hover:bg-slate-200 rounded-lg transition-colors" title="閉じる">
+                    <i class="fas fa-compress text-slate-500"></i>
+                </button>
+            </div>
+            <div class="flex-1 p-6">
+                <!-- 編集用 -->
+                <textarea id="fullscreen-editor" class="hidden w-full h-full border border-slate-200 rounded-lg px-4 py-3 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-none" oninput="syncFromFullscreen()"></textarea>
+                <!-- プレビュー用 -->
+                <div id="fullscreen-preview" class="hidden markdown-preview w-full h-full overflow-auto border border-slate-200 rounded-lg px-4 py-3 bg-white"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // サイドバーモーダル
+        const sidebarModal = document.getElementById('sidebar-modal');
+        const sidebarOverlay = document.getElementById('sidebar-overlay');
+        const menuToggle = document.getElementById('menu-toggle');
+        const sidebarClose = document.getElementById('sidebar-close');
+
+        function openSidebar() {
+            sidebarModal.classList.add('show');
+            sidebarOverlay.classList.add('show');
+        }
+        function closeSidebar() {
+            sidebarModal.classList.remove('show');
+            sidebarOverlay.classList.remove('show');
+        }
+        menuToggle.addEventListener('click', openSidebar);
+        sidebarClose.addEventListener('click', closeSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        // ユーザーメニュー
+        const userMenuTrigger = document.getElementById('user-menu-trigger');
+        const userMenuDropdown = document.getElementById('user-menu-dropdown');
+        const userMenuArrow = document.getElementById('user-menu-arrow');
+
+        userMenuTrigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userMenuDropdown.classList.toggle('show');
+            userMenuArrow.style.transform = userMenuDropdown.classList.contains('show') ? 'rotate(180deg)' : '';
+        });
+
+        document.addEventListener('click', () => {
+            userMenuDropdown.classList.remove('show');
+            userMenuArrow.style.transform = '';
+        });
+
+        // 今日の日付を設定
+        function setTodayDate() {
+            const today = new Date();
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('today-date').textContent = today.toLocaleDateString('ja-JP', options);
+        }
+        setTodayDate();
+
+        // 週の計算
+        function getWeekRange(date = new Date()) {
+            const d = new Date(date);
+            const day = d.getDay();
+            let daysToThursday;
+            if (day >= 4) {
+                daysToThursday = day - 4;
+            } else {
+                daysToThursday = day + 3;
+            }
+            const startDate = new Date(d);
+            startDate.setDate(d.getDate() - daysToThursday);
+            const endDate = new Date(startDate);
+            endDate.setDate(startDate.getDate() + 6);
+            return { startDate, endDate };
+        }
+
+        function formatDateForInput(date) {
+            return date.toISOString().split('T')[0];
+        }
+
+        function setThisWeek() {
+            const { startDate, endDate } = getWeekRange();
+            document.getElementById('start-date').value = formatDateForInput(startDate);
+            document.getElementById('end-date').value = formatDateForInput(endDate);
+        }
+
+        // Markdownプレビュー更新
+        function updatePreview() {
+            const markdown = document.getElementById('markdown-input').value;
+            const preview = document.getElementById('markdown-preview');
+            if (markdown.trim()) {
+                preview.innerHTML = marked.parse(markdown);
+            } else {
+                preview.innerHTML = '<p class="text-slate-400 text-sm">プレビューがここに表示されます</p>';
+            }
+
+            // 最大化モードの場合も更新
+            const fullscreenPreview = document.getElementById('fullscreen-preview');
+            if (!fullscreenPreview.classList.contains('hidden')) {
+                fullscreenPreview.innerHTML = marked.parse(markdown);
+            }
+        }
+
+        // 初期プレビュー表示
+        updatePreview();
+
+        // 最大化モード
+        let currentFullscreenMode = null;
+
+        function toggleFullscreen(mode) {
+            const modal = document.getElementById('fullscreen-modal');
+            const editor = document.getElementById('fullscreen-editor');
+            const preview = document.getElementById('fullscreen-preview');
+            const title = document.getElementById('fullscreen-title');
+            const mainInput = document.getElementById('markdown-input');
+
+            currentFullscreenMode = mode;
+            modal.classList.remove('hidden');
+
+            if (mode === 'edit') {
+                title.innerHTML = '<i class="fas fa-edit text-amber-500 mr-2"></i>マークダウン編集';
+                editor.classList.remove('hidden');
+                preview.classList.add('hidden');
+                editor.value = mainInput.value;
+                editor.focus();
+            } else {
+                title.innerHTML = '<i class="fas fa-eye text-blue-500 mr-2"></i>HTMLプレビュー';
+                editor.classList.add('hidden');
+                preview.classList.remove('hidden');
+                preview.innerHTML = marked.parse(mainInput.value);
+            }
+
+            document.body.style.overflow = 'hidden';
+        }
+
+        function closeFullscreen() {
+            const modal = document.getElementById('fullscreen-modal');
+            const editor = document.getElementById('fullscreen-editor');
+
+            // 編集モードの場合、内容を同期
+            if (currentFullscreenMode === 'edit') {
+                document.getElementById('markdown-input').value = editor.value;
+                updatePreview();
+            }
+
+            modal.classList.add('hidden');
+            document.body.style.overflow = '';
+            currentFullscreenMode = null;
+        }
+
+        function syncFromFullscreen() {
+            const editor = document.getElementById('fullscreen-editor');
+            document.getElementById('markdown-input').value = editor.value;
+            updatePreview();
+        }
+
+        // タスク情報をコピー
+        function copyTaskInfo() {
+            const table = document.getElementById('task-info-body');
+            const rows = table.querySelectorAll('tr');
+            let text = 'タスク名\t担当者\t予定開始\t予定終了\t実績開始\t実績終了\t進捗率\tステータス\n';
+
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                const rowData = Array.from(cells).map(cell => cell.textContent.trim()).join('\t');
+                text += rowData + '\n';
+            });
+
+            navigator.clipboard.writeText(text).then(() => {
+                alert('タスク情報をクリップボードにコピーしました');
+            });
+        }
+
+        // 下書き保存
+        function saveDraft() {
+            alert('下書きを保存しました');
+        }
+
+        // レポート提出
+        function submitReport() {
+            if (confirm('レポートを提出してよろしいですか？')) {
+                alert('レポートを提出しました');
+                location.href = 'index.html';
+            }
+        }
+
+        // ログアウト
+        function logout() {
+            if (confirm('ログアウトしてよろしいですか？')) {
+                location.href = '../login.html';
+            }
+        }
+
+        // ESCキーで最大化モードを閉じる
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && currentFullscreenMode) {
+                closeFullscreen();
+            }
+        });
+    </script>
+</body>
+</html>
