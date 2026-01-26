@@ -232,7 +232,7 @@
             <?= $this->include('layouts/partials/header') ?>
 
             <!-- メインコンテンツエリア -->
-            <main class="flex-1 overflow-y-auto">
+            <main class="flex-1 <?= $this->renderSection('mainClass') ?: 'overflow-y-auto' ?>">
                 <?= $this->renderSection('content') ?>
             </main>
         </div>
@@ -240,34 +240,37 @@
 
     <!-- トースト通知コンテナ -->
     <div class="toast-container" id="toast-container">
-        <?php if (session()->getFlashdata('success')): ?>
+        <?php $successMsg = session()->getFlashdata('success'); ?>
+        <?php if ($successMsg && trim($successMsg) !== ''): ?>
         <div class="toast toast-success" id="toast-success">
             <div class="toast-icon">
                 <i class="fas fa-check-circle"></i>
             </div>
-            <div class="toast-message"><?= esc(session()->getFlashdata('success')) ?></div>
+            <div class="toast-message"><?= esc($successMsg) ?></div>
             <div class="toast-close" onclick="closeToast('toast-success')">
                 <i class="fas fa-times"></i>
             </div>
         </div>
         <?php endif; ?>
-        <?php if (session()->getFlashdata('error')): ?>
+        <?php $errorMsg = session()->getFlashdata('error'); ?>
+        <?php if ($errorMsg && trim($errorMsg) !== ''): ?>
         <div class="toast toast-error" id="toast-error">
             <div class="toast-icon">
                 <i class="fas fa-exclamation-circle"></i>
             </div>
-            <div class="toast-message"><?= esc(session()->getFlashdata('error')) ?></div>
+            <div class="toast-message"><?= esc($errorMsg) ?></div>
             <div class="toast-close" onclick="closeToast('toast-error')">
                 <i class="fas fa-times"></i>
             </div>
         </div>
         <?php endif; ?>
-        <?php if (session()->getFlashdata('info')): ?>
+        <?php $infoMsg = session()->getFlashdata('info'); ?>
+        <?php if ($infoMsg && trim($infoMsg) !== ''): ?>
         <div class="toast toast-info" id="toast-info">
             <div class="toast-icon">
                 <i class="fas fa-info-circle"></i>
             </div>
-            <div class="toast-message"><?= esc(session()->getFlashdata('info')) ?></div>
+            <div class="toast-message"><?= esc($infoMsg) ?></div>
             <div class="toast-close" onclick="closeToast('toast-info')">
                 <i class="fas fa-times"></i>
             </div>

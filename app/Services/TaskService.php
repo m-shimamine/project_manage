@@ -639,11 +639,12 @@ class TaskService
 
         $imported = 0;
         $errors = [];
-        $parentTaskMap = [];
+        $parentTaskMapByName = [];
+        $parentTaskMapByNo = [];
 
-        // まず親タスクを処理（parent_nameがないもの）
+        // まず親タスクを処理（parent_name, parent_noがないもの）
         foreach ($tasks as $index => $taskData) {
-            if (!empty($taskData['parent_name'])) {
+            if (!empty($taskData['parent_name']) || !empty($taskData['parent_no'])) {
                 continue;
             }
 
@@ -651,35 +652,42 @@ class TaskService
             if ($result['success']) {
                 $imported++;
                 // タスク名でマッピング
-                $parentTaskMap[$taskData['task_name']] = $result['data']['id'];
+                $parentTaskMapByName[$taskData['task_name']] = $result['data']['id'];
+                // Noでマッピング（indexは0始まりなので+1）
+                $parentTaskMapByNo[(string)($index + 1)] = $result['data']['id'];
             } else {
                 $errors[] = $result['errors'] ?? $result['error'] ?? "タスク {$index} の作成に失敗しました";
             }
         }
 
-        // 次にサブタスク（parent_nameがあるもの）を処理
+        // 次にサブタスク（parent_name または parent_no があるもの）を処理
         foreach ($tasks as $index => $taskData) {
-            if (empty($taskData['parent_name'])) {
+            if (empty($taskData['parent_name']) && empty($taskData['parent_no'])) {
                 continue;
             }
 
-            $parentName = $taskData['parent_name'];
+            $parentNo = $taskData['parent_no'] ?? null;
+            $parentName = $taskData['parent_name'] ?? null;
             unset($taskData['parent_name']);
+            unset($taskData['parent_no']);
 
-            // 親タスクIDを取得
-            if (isset($parentTaskMap[$parentName])) {
-                $taskData['parent_id'] = $parentTaskMap[$parentName];
+            // 親タスクIDを取得（parent_noを優先）
+            if ($parentNo && isset($parentTaskMapByNo[$parentNo])) {
+                $taskData['parent_id'] = $parentTaskMapByNo[$parentNo];
+            } elseif ($parentName && isset($parentTaskMapByName[$parentName])) {
+                $taskData['parent_id'] = $parentTaskMapByName[$parentName];
             } else {
-                // 既存の親タスクを検索
+                // 既存の親タスクを検索（名前で）
+                $searchName = $parentName ?: $parentNo;
                 $parentTask = $this->taskModel
                     ->where('project_id', $taskData['project_id'])
-                    ->where('task_name', $parentName)
+                    ->where('task_name', $searchName)
                     ->first();
 
                 if ($parentTask) {
                     $taskData['parent_id'] = $parentTask['id'];
                 } else {
-                    $errors[] = "サブタスク「{$taskData['task_name']}」の親タスク「{$parentName}」が見つかりません";
+                    $errors[] = "サブタスク「{$taskData['task_name']}」の親タスク（No: {$parentNo}）が見つかりません";
                     continue;
                 }
             }

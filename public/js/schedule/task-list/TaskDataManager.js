@@ -308,18 +308,31 @@ class TaskDataManager {
      * フィルター条件にマッチするかチェック
      */
     matchesFilter(task, filters) {
-        // 工程フィルター
-        if (filters.process && task.process_id != filters.process) {
+        // 工程フィルター（文字列として比較）
+        if (filters.process && String(task.process_id || '') !== String(filters.process)) {
             return false;
         }
 
-        // 担当者フィルター
-        if (filters.assignee && task.assignee_id != filters.assignee) {
-            return false;
+        // タスク名フィルター（部分一致）
+        if (filters.taskName) {
+            const filterLower = filters.taskName.toLowerCase();
+            const taskName = (task.task_name || '').toLowerCase();
+            if (!taskName.includes(filterLower)) {
+                return false;
+            }
+        }
+
+        // 担当者名フィルター（部分一致）
+        if (filters.assigneeName) {
+            const filterLower = filters.assigneeName.toLowerCase();
+            const assigneeName = (task.assignee_name || '').toLowerCase();
+            if (!assigneeName.includes(filterLower)) {
+                return false;
+            }
         }
 
         // ステータスフィルター
-        if (filters.status && task.status !== filters.status) {
+        if (filters.status && (task.status || '') !== filters.status) {
             return false;
         }
 
@@ -328,20 +341,6 @@ class TaskDataManager {
             const isDelayed = task.delay_days && task.delay_days > 0;
             if (filters.delay === 'delayed' && !isDelayed) return false;
             if (filters.delay === 'on-time' && isDelayed) return false;
-        }
-
-        // テキスト検索
-        if (filters.search) {
-            const searchLower = filters.search.toLowerCase();
-            const taskName = (task.task_name || '').toLowerCase();
-            const assigneeName = (task.assignee_name || '').toLowerCase();
-            const description = (task.description || '').toLowerCase();
-
-            if (!taskName.includes(searchLower) &&
-                !assigneeName.includes(searchLower) &&
-                !description.includes(searchLower)) {
-                return false;
-            }
         }
 
         return true;

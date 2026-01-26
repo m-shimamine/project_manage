@@ -2,6 +2,32 @@
 
 <?= $this->section('styles') ?>
 <style>
+    /* 予定/実績切り替えボタン */
+    .toggle-btn-group {
+        display: flex;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    .toggle-btn-item {
+        padding: 6px 16px;
+        font-size: 13px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+        border: none;
+        background: white;
+        text-decoration: none;
+        color: #475569;
+    }
+    .toggle-btn-item.active {
+        background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+        color: white;
+    }
+    .toggle-btn-item:not(.active):hover {
+        background: #f8fafc;
+    }
+
     /* チェックボックスを大きく */
     .row-checkbox, #select-all {
         width: 18px;
@@ -18,8 +44,8 @@
     .edit-input:focus { outline: none; }
 
     /* 行選択 */
-    .task-row.selected { background: #eff6ff !important; }
-    .task-row:hover { background: #f8fafc; }
+    .task-row.selected, .task-row.selected td { background: #eff6ff !important; }
+    .task-row:hover, .task-row:hover td { background: #f8fafc !important; }
 
     /* ステータスバッジ */
     .status-badge { font-size: 11px; padding: 2px 8px; border-radius: 9999px; font-weight: 600; }
@@ -30,8 +56,9 @@
 
     /* 遅延バッジ */
     .delay-badge { font-size: 10px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }
-    .delay-late { background: #fee2e2; color: #dc2626; }
-    .delay-early { background: #d1fae5; color: #059669; }
+    .delay-late { background: #fef2f2; color: #dc2626; }
+    .delay-early { background: #f0fdf4; color: #16a34a; }
+    .delay-ontime { background: #f8fafc; color: #64748b; }
 
     /* テーブルスクロール */
     .table-container { scrollbar-width: thin; scrollbar-color: rgba(156, 163, 175, 0.5) transparent; }
@@ -57,12 +84,13 @@
     .drag-handle { cursor: grab; color: #94a3b8; padding: 4px; }
     .drag-handle:hover { color: #3b82f6; }
     .drag-handle:active { cursor: grabbing; }
-    .task-row.dragging { opacity: 0.5; background: #dbeafe; }
+    .task-row.dragging, .task-row.dragging td { opacity: 0.5; background: #dbeafe !important; }
     .task-row.drag-over { border-top: 2px solid #3b82f6; }
-    .task-row.copied { background: #ecfdf5 !important; }
-    .task-row.date-edited, .subtask-row.date-edited { background: #fef9c3 !important; }
-    .task-row.completed-row { background: #f0fdf4 !important; }
-    .task-row.completed-row:hover { background: #dcfce7 !important; }
+    .task-row.copied, .task-row.copied td { background: #ecfdf5 !important; }
+    .task-row.date-edited, .task-row.date-edited td,
+    .subtask-row.date-edited, .subtask-row.date-edited td { background: #fef9c3 !important; }
+    .task-row.completed-row, .task-row.completed-row td { background: #f0fdf4 !important; }
+    .task-row.completed-row:hover, .task-row.completed-row:hover td { background: #dcfce7 !important; }
 
     /* サブタスク行 */
     .subtask-row { background: #f8fafc; }
@@ -103,7 +131,21 @@
     .filter-dropdown-search input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; }
     .filter-dropdown-header { padding: 6px 12px; font-size: 11px; color: #94a3b8; font-weight: 600; text-transform: uppercase; }
 
-    /* 検索パネル（スケジュールと同様） */
+    /* テキスト入力フィルタ */
+    .filter-dropdown-input { padding: 8px; }
+    .filter-text-input { width: 100%; padding: 8px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; margin-bottom: 8px; }
+    .filter-text-input:focus { outline: none; border-color: #3b82f6; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2); }
+    .filter-dropdown-input .filter-dropdown-item { border-top: 1px solid #e2e8f0; margin-top: 4px; padding-top: 8px; }
+
+    /* 検索可能ドロップダウン */
+    .filter-dropdown-searchable { min-width: 160px; }
+    .filter-dropdown-searchable .filter-dropdown-search { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+    .filter-dropdown-searchable .filter-dropdown-search input { width: 100%; padding: 6px 8px; border: 1px solid #e2e8f0; border-radius: 4px; font-size: 12px; }
+    .filter-dropdown-searchable .filter-dropdown-search input:focus { outline: none; border-color: #3b82f6; }
+    .filter-options-container { max-height: 200px; overflow-y: auto; }
+    .filter-dropdown-item.hidden { display: none; }
+
+    /* 検索パネル */
     .search-panel { background: white; border-bottom: 1px solid #e2e8f0; padding: 12px 16px; display: none; }
     .search-panel.show { display: block; }
 
@@ -148,10 +190,12 @@
 </style>
 <?= $this->endSection() ?>
 
+<?= $this->section('mainClass') ?>overflow-hidden<?= $this->endSection() ?>
+
 <?= $this->section('content') ?>
 <div class="flex flex-col h-full overflow-hidden">
     <!-- サブヘッダー -->
-    <div class="bg-white border-b border-slate-200 px-6 py-3">
+    <div class="bg-white border-b border-slate-200 px-6 py-3 flex-shrink-0">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-4">
                 <!-- プロジェクト選択 -->
@@ -170,13 +214,13 @@
                     </select>
                 </form>
 
-                <!-- 表示切り替え -->
-                <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
-                    <a href="<?= base_url('schedule?project_id=' . $projectId) ?>" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border-r border-slate-300">
-                        <i class="fas fa-chart-gantt mr-2"></i>ガントチャート
+                <!-- ガントチャート/タスク切り替え -->
+                <div class="toggle-btn-group">
+                    <a href="<?= base_url('schedule?project_id=' . $projectId) ?>" class="toggle-btn-item">
+                        <i class="fas fa-chart-gantt mr-1"></i>ガントチャート
                     </a>
-                    <span class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600">
-                        <i class="fas fa-list mr-2"></i>一覧
+                    <span class="toggle-btn-item active">
+                        <i class="fas fa-list mr-1"></i>タスク
                     </span>
                 </div>
             </div>
@@ -194,12 +238,12 @@
                 <button onclick="openExportModal()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 shadow-sm bg-white">
                     <i class="fas fa-file-export mr-2"></i>エクスポート
                 </button>
-                <!-- 表示/編集モード -->
-                <div class="flex items-center border border-slate-300 rounded-lg overflow-hidden bg-white shadow-sm">
-                    <button type="button" id="btn-view-mode" class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600" onclick="switchViewMode('view')">
+                <!-- 表示/編集モード切り替え -->
+                <div class="toggle-btn-group">
+                    <button id="btn-view-mode" class="toggle-btn-item active" onclick="switchViewMode('view')">
                         <i class="fas fa-eye mr-1"></i>表示
                     </button>
-                    <button type="button" id="btn-edit-mode" class="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border-l border-slate-300" onclick="switchViewMode('edit')">
+                    <button id="btn-edit-mode" class="toggle-btn-item" onclick="switchViewMode('edit')">
                         <i class="fas fa-edit mr-1"></i>編集
                     </button>
                 </div>
@@ -211,18 +255,9 @@
         </div>
     </div>
 
-    <!-- 検索パネル（スケジュールと同様） -->
+    <!-- 検索パネル -->
     <div id="search-panel" class="search-panel">
         <div class="flex flex-wrap items-center gap-3">
-            <div class="flex items-center space-x-2">
-                <label class="text-sm text-slate-600 font-medium">担当者:</label>
-                <select id="filter-assignee" class="border border-slate-300 rounded px-2 py-1.5 text-sm bg-white" onchange="applyFilter()">
-                    <option value="">すべて</option>
-                    <?php foreach ($members as $member): ?>
-                        <option value="<?= $member['id'] ?>"><?= esc($member['name']) ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
             <div class="flex items-center space-x-2">
                 <label class="text-sm text-slate-600 font-medium">ステータス:</label>
                 <select id="filter-status" class="border border-slate-300 rounded px-2 py-1.5 text-sm bg-white" onchange="applyFilter()">
@@ -231,15 +266,6 @@
                     <option value="in_progress">進行中</option>
                     <option value="completed">完了</option>
                     <option value="on_hold">保留</option>
-                </select>
-            </div>
-            <div class="flex items-center space-x-2">
-                <label class="text-sm text-slate-600 font-medium">工程:</label>
-                <select id="filter-process" class="border border-slate-300 rounded px-2 py-1.5 text-sm bg-white" onchange="applyFilter()">
-                    <option value="">すべて</option>
-                    <?php foreach ($processes as $process): ?>
-                        <option value="<?= $process['id'] ?>"><?= esc($process['name']) ?></option>
-                    <?php endforeach; ?>
                 </select>
             </div>
             <button onclick="clearFilter()" class="px-4 py-1.5 border border-slate-300 rounded text-sm font-medium text-slate-600 hover:bg-slate-50">クリア</button>
@@ -293,15 +319,27 @@
                                 <?php endforeach; ?>
                             </div>
                         </th>
-                        <th class="min-w-40 px-2 py-3 text-xs font-bold text-slate-600 text-left border-r border-slate-200" rowspan="2">タスク名</th>
+                        <!-- タスク名（フィルター付き） -->
+                        <th class="min-w-40 px-2 py-3 text-xs font-bold text-slate-600 text-left border-r border-slate-200 header-filter" rowspan="2" data-filter-type="taskName">
+                            タスク名<i class="fas fa-filter filter-icon"></i>
+                            <div id="filter-dropdown-taskName" class="filter-dropdown filter-dropdown-input">
+                                <input type="text" id="filter-input-taskName" class="filter-text-input" placeholder="部分一致検索" onclick="event.stopPropagation()" oninput="applyHeaderTextFilter('taskName')">
+                                <div class="filter-dropdown-item" data-value="" onclick="clearHeaderFilter('taskName')"><i class="fas fa-times"></i>クリア</div>
+                            </div>
+                        </th>
                         <!-- 担当者（フィルター付き） -->
-                        <th class="w-16 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200 header-filter" rowspan="2" data-filter-type="assignee">
+                        <th class="w-20 px-2 py-3 text-xs font-bold text-slate-600 text-center border-r border-slate-200 header-filter" rowspan="2" data-filter-type="assigneeName">
                             担当者<i class="fas fa-filter filter-icon"></i>
-                            <div id="filter-dropdown-assignee" class="filter-dropdown">
-                                <div class="filter-dropdown-item" data-value=""><i class="fas fa-check"></i>すべて</div>
-                                <?php foreach ($members as $member): ?>
-                                    <div class="filter-dropdown-item" data-value="<?= $member['id'] ?>"><?= esc($member['name']) ?></div>
-                                <?php endforeach; ?>
+                            <div id="filter-dropdown-assigneeName" class="filter-dropdown filter-dropdown-searchable">
+                                <div class="filter-dropdown-search">
+                                    <input type="text" id="filter-search-assigneeName" placeholder="検索..." onclick="event.stopPropagation()" oninput="filterAssigneeOptions(this.value)">
+                                </div>
+                                <div id="assignee-options-container" class="filter-options-container">
+                                    <div class="filter-dropdown-item" data-value=""><i class="fas fa-check"></i>すべて</div>
+                                    <?php foreach ($members as $member): ?>
+                                        <div class="filter-dropdown-item assignee-option" data-value="<?= esc($member['name']) ?>"><?= esc($member['name']) ?></div>
+                                    <?php endforeach; ?>
+                                </div>
                             </div>
                         </th>
                         <!-- ステータス（フィルター付き） -->
@@ -486,32 +524,35 @@
 
     <!-- フッター -->
     <footer class="bg-white border-t border-slate-200 px-6 py-3 flex-shrink-0">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center space-x-4 text-xs text-slate-500">
+        <div class="flex items-center justify-between text-xs text-slate-500">
+            <div class="flex items-center space-x-4">
                 <span><i class="fas fa-tasks mr-1"></i>全タスク: <strong class="text-slate-700" id="total-count"><?= $taskStats['total'] ?? 0 ?>件</strong></span>
                 <span><i class="fas fa-check-circle mr-1 text-emerald-500"></i>完了: <strong class="text-emerald-600" id="completed-count"><?= $taskStats['completed'] ?? 0 ?>件</strong></span>
                 <span><i class="fas fa-spinner mr-1 text-blue-500"></i>進行中: <strong class="text-blue-600" id="progress-count"><?= $taskStats['in_progress'] ?? 0 ?>件</strong></span>
                 <span><i class="fas fa-clock mr-1 text-slate-400"></i>未着手: <strong class="text-slate-600" id="notstarted-count"><?= $taskStats['not_started'] ?? 0 ?>件</strong></span>
                 <span class="border-l border-slate-300 pl-4"><i class="fas fa-exclamation-triangle mr-1 text-rose-500"></i>遅延: <strong class="text-rose-600" id="delayed-count"><?= $taskStats['delayed'] ?? 0 ?>件</strong></span>
             </div>
-            <div id="edit-actions" class="flex items-center space-x-3 hidden">
-                <span class="text-sm text-amber-600"><i class="fas fa-info-circle mr-1"></i>編集モード中</span>
-                <!-- 一括日付更新ボタン（日付編集時に表示） -->
-                <button id="bulk-date-btn" onclick="openBulkDateModal()" class="hidden px-4 py-2 border border-amber-400 rounded-lg text-sm font-medium text-amber-700 hover:bg-amber-50 shadow-sm bg-amber-50">
-                    <i class="fas fa-calendar-alt mr-2"></i>一括日付更新
+            <div class="flex items-center space-x-3">
+                <!-- モードインジケーター -->
+                <span id="view-mode-indicator" class="bg-slate-500 text-white px-3 py-1 rounded text-xs font-medium">
+                    <i class="fas fa-eye mr-1"></i>表示モード
+                </span>
+                <span id="edit-mode-indicator" class="hidden bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium">
+                    <i class="fas fa-edit mr-1"></i>編集モード
+                </span>
+                <!-- 編集モード時のボタン群 -->
+                <button id="bulk-date-btn" onclick="openBulkDateModal()" class="hidden px-3 py-1.5 border border-amber-400 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-50 bg-amber-50">
+                    <i class="fas fa-calendar-alt mr-1"></i>一括日付更新
                 </button>
-                <button onclick="undoChanges()" id="undo-btn" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 bg-white disabled:opacity-50 disabled:cursor-not-allowed" disabled title="元に戻す (Ctrl+Z)">
-                    <i class="fas fa-undo mr-2"></i>元に戻す
+                <button onclick="undoChanges()" id="undo-btn" class="hidden px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled title="元に戻す (Ctrl+Z)">
+                    <i class="fas fa-undo mr-1"></i>元に戻す
                 </button>
-                <button onclick="cancelEdit()" class="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 bg-white">
-                    キャンセル
+                <button onclick="cancelEdit()" id="cancel-edit-btn" class="hidden px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition-all">
+                    <i class="fas fa-times mr-1"></i>キャンセル
                 </button>
-                <button onclick="saveAllTasks()" class="px-5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg text-sm font-semibold hover:from-blue-700 hover:to-indigo-700 shadow-lg">
-                    <i class="fas fa-save mr-2"></i>登録
+                <button onclick="saveAllTasks()" id="save-all-btn" class="hidden px-4 py-1.5 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-lg text-xs font-semibold hover:from-rose-600 hover:to-red-700 shadow-lg transition-all">
+                    <i class="fas fa-save mr-1"></i>変更を登録
                 </button>
-            </div>
-            <div id="view-actions" class="flex items-center space-x-3">
-                <span class="text-slate-400">© 2024 PM System</span>
             </div>
         </div>
     </footer>
@@ -593,6 +634,37 @@
                             <option value="<?= $process['id'] ?>"><?= esc($process['name']) ?></option>
                         <?php endforeach; ?>
                     </select>
+                </div>
+                <div class="border-t border-slate-200 pt-4 mt-4">
+                    <p class="text-sm font-semibold text-slate-700 mb-2">日付の一括更新</p>
+                    <p class="text-xs text-slate-500 mb-3">チェックした行を起点として日付を更新できます</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">予定開始日</label>
+                            <input type="date" id="bulk-planned-start" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">予定終了日</label>
+                            <input type="date" id="bulk-planned-end" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">実績開始日</label>
+                            <input type="date" id="bulk-actual-start" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs text-slate-600 mb-1">実績終了日</label>
+                            <input type="date" id="bulk-actual-end" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                    </div>
+                    <div class="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <label class="flex items-start text-sm text-amber-800 cursor-pointer">
+                            <input type="checkbox" id="bulk-update-subsequent" class="mt-0.5 mr-2 rounded border-amber-400 text-amber-600 focus:ring-amber-500">
+                            <span>
+                                <strong>チェックした行から下のタスクもすべて更新</strong>
+                                <br><span class="text-xs text-amber-600">※選択した行を起点に、それ以降のタスクの日付を一括更新します</span>
+                            </span>
+                        </label>
+                    </div>
                 </div>
             </div>
             <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-slate-200">
@@ -726,7 +798,7 @@
                 <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
                     <p class="text-xs text-blue-700">
                         <i class="fas fa-info-circle mr-1"></i>
-                        <strong>CSVフォーマット:</strong> タスク名,工程,担当者,ステータス,進捗率,予定開始日,予定終了日,予定工数,見積工数,予定コスト,実績開始日,実績終了日,実績工数,実績コスト,説明,親タスク<br>
+                        <strong>CSVフォーマット:</strong> No,工程,タスク名,担当者,ステータス,営業工数,予定工数,予定開始日,予定終了日,予定原価,実績工数,実績開始日,実績終了日,出来高,進捗率,備考,親タスクNo<br>
                         <a href="javascript:downloadTemplate()" class="text-blue-600 underline hover:text-blue-800">テンプレートをダウンロード</a>
                     </p>
                 </div>
@@ -757,8 +829,8 @@
         </div>
         <div class="p-6 space-y-4">
             <div class="p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p class="text-sm font-medium text-amber-800 mb-1"><i class="fas fa-play mr-1"></i>開始タスク（編集したタスク）</p>
-                <p id="bulk-start-task-display" class="text-sm text-amber-700">-</p>
+                <p class="text-sm font-medium text-amber-800 mb-1"><i class="fas fa-check-square mr-1"></i>開始タスク（チェックした行）</p>
+                <p id="bulk-start-task-display" class="text-sm text-amber-700 font-medium">-</p>
                 <input type="hidden" id="bulk-start-task" value="">
             </div>
             <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
@@ -841,6 +913,8 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<!-- SheetJS for Excel export -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
 <!-- タスク一覧用JavaScriptクラス -->
 <?php $jsVer = '?v=' . time(); ?>
 <script src="<?= base_url('js/schedule/task-list/TaskDataManager.js') . $jsVer ?>"></script>
@@ -888,7 +962,12 @@ document.addEventListener('DOMContentLoaded', function() {
             const dropdown = this.closest('.filter-dropdown');
             const filterType = dropdown.id.replace('filter-dropdown-', '');
             const value = this.dataset.value || '';
-            selectHeaderFilter(e, filterType, value);
+            // 担当者フィルタは専用関数を使用
+            if (filterType === 'assigneeName') {
+                selectAssigneeFilter(value);
+            } else {
+                selectHeaderFilter(e, filterType, value);
+            }
         });
     });
 
@@ -922,11 +1001,72 @@ function selectHeaderFilter(event, filterType, value) {
     event.stopPropagation();
     if (taskListApp) {
         taskListApp.activeFilters[filterType] = value;
-        document.getElementById('filter-dropdown-' + filterType)?.classList.remove('show');
+        const dropdown = document.getElementById('filter-dropdown-' + filterType);
+        if (dropdown) {
+            dropdown.classList.remove('show');
+            // 選択状態のスタイルを更新
+            dropdown.querySelectorAll('.filter-dropdown-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.value === value);
+            });
+        }
         const header = document.querySelector(`th[data-filter-type="${filterType}"]`);
         if (header) header.classList.toggle('has-filter', !!value);
         const panelSelect = document.getElementById('filter-' + filterType);
         if (panelSelect) panelSelect.value = value;
+        taskListApp.applyFilters();
+    }
+}
+
+function clearHeaderFilter(filterType) {
+    const input = document.getElementById('filter-input-' + filterType);
+    if (input) input.value = '';
+    if (taskListApp) {
+        taskListApp.activeFilters[filterType] = '';
+        document.getElementById('filter-dropdown-' + filterType)?.classList.remove('show');
+        const header = document.querySelector(`th[data-filter-type="${filterType}"]`);
+        if (header) header.classList.remove('has-filter');
+        taskListApp.applyFilters();
+    }
+}
+
+function applyHeaderTextFilter(filterType) {
+    const input = document.getElementById('filter-input-' + filterType);
+    if (input && taskListApp) {
+        taskListApp.activeFilters[filterType] = input.value;
+        const header = document.querySelector(`th[data-filter-type="${filterType}"]`);
+        if (header) header.classList.toggle('has-filter', !!input.value);
+        taskListApp.applyFilters();
+    }
+}
+
+// 担当者オプションをフィルタリング
+function filterAssigneeOptions(searchText) {
+    const options = document.querySelectorAll('#assignee-options-container .assignee-option');
+    const searchLower = searchText.toLowerCase();
+    options.forEach(option => {
+        const text = option.textContent.toLowerCase();
+        option.classList.toggle('hidden', !text.includes(searchLower));
+    });
+}
+
+// 担当者フィルタを選択
+function selectAssigneeFilter(value) {
+    if (taskListApp) {
+        taskListApp.activeFilters.assigneeName = value;
+        const dropdown = document.getElementById('filter-dropdown-assigneeName');
+        if (dropdown) {
+            dropdown.classList.remove('show');
+            // 選択状態のスタイルを更新
+            dropdown.querySelectorAll('.filter-dropdown-item').forEach(item => {
+                item.classList.toggle('selected', item.dataset.value === value);
+            });
+        }
+        const header = document.querySelector('th[data-filter-type="assigneeName"]');
+        if (header) header.classList.toggle('has-filter', !!value);
+        // 検索ボックスをクリア
+        const searchInput = document.getElementById('filter-search-assigneeName');
+        if (searchInput) searchInput.value = '';
+        filterAssigneeOptions('');
         taskListApp.applyFilters();
     }
 }
@@ -1105,10 +1245,10 @@ function executeExport() {
 
     // CSVデータ作成（一覧の列順に合わせる）
     const headers = [
-        '工程', 'タスク名', '担当者', 'ステータス',
+        'No', '工程', 'タスク名', '担当者', 'ステータス',
         '営業工数', '予定工数', '予定開始日', '予定終了日', '予定原価',
         '実績工数', '実績開始日', '実績終了日', '出来高',
-        '進捗率', '備考', '親タスク'
+        '進捗率', '備考', '親タスクNo'
     ];
     let rows = [headers];
 
@@ -1125,8 +1265,11 @@ function executeExport() {
         'on_hold': '保留'
     };
 
+    let rowNo = 1;
     tasks.forEach(task => {
+        const parentNo = rowNo;
         rows.push([
+            rowNo++,
             processMap[task.process_id] || '',
             task.task_name || '',
             memberMap[task.assignee_id] || '',
@@ -1148,6 +1291,7 @@ function executeExport() {
         if (includeSubtasks && task.subtasks) {
             task.subtasks.forEach(subtask => {
                 rows.push([
+                    rowNo++,
                     processMap[subtask.process_id] || '',
                     subtask.task_name || '',
                     memberMap[subtask.assignee_id] || '',
@@ -1163,7 +1307,7 @@ function executeExport() {
                     subtask.actual_cost || '',
                     subtask.progress || '0',
                     subtask.description || '',
-                    task.task_name || ''
+                    parentNo
                 ]);
             });
         }
@@ -1203,38 +1347,38 @@ function downloadCSV(rows, filename) {
     URL.revokeObjectURL(url);
 }
 
-// Excel形式ダウンロード（簡易的にCSVとして出力、拡張子のみxlsx）
+// Excel形式ダウンロード（SheetJSを使用して正しいxlsx形式で出力）
 function downloadExcel(rows, filename) {
-    // SheetJSなどのライブラリがない場合はCSV互換で出力
-    const bom = '\uFEFF';
-    const csv = rows.map(row => row.map(cell => String(cell)).join('\t')).join('\n');
+    // SheetJSを使用してワークブックを作成
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'タスク一覧');
 
-    const blob = new Blob([bom + csv], { type: 'application/vnd.ms-excel;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename.replace('.xlsx', '.xls');
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    // xlsxファイルとしてダウンロード
+    XLSX.writeFile(wb, filename);
 }
 
 // テンプレートダウンロード
 function downloadTemplate() {
     const headers = [
-        '工程', 'タスク名', '担当者', 'ステータス',
+        'No', '工程', 'タスク名', '担当者', 'ステータス',
         '営業工数', '予定工数', '予定開始日', '予定終了日', '予定原価',
         '実績工数', '実績開始日', '実績終了日', '出来高',
-        '進捗率', '備考', '親タスク'
+        '進捗率', '備考', '親タスクNo'
     ];
-    const example = [
-        '設計', 'サンプルタスク', '山田太郎', '未着手',
+    const example1 = [
+        '1', '設計', 'サンプル親タスク', '山田太郎', '未着手',
         '5', '3', '2025-01-20', '2025-01-25', '100000',
         '', '', '', '',
         '0', 'タスクの説明文', ''
     ];
-    downloadCSV([headers, example], 'task_import_template.csv');
+    const example2 = [
+        '2', '設計', 'サンプル子タスク', '山田太郎', '未着手',
+        '2', '1', '2025-01-20', '2025-01-22', '50000',
+        '', '', '', '',
+        '0', '親タスクの子タスク', '1'
+    ];
+    downloadCSV([headers, example1, example2], 'task_import_template.csv');
 }
 
 // インポート実行
@@ -1287,10 +1431,10 @@ async function executeImport() {
     const firstLine = lines[0];
     const isTabSeparated = firstLine.includes('\t');
 
-    // ヘッダー行の判定（最初の列が「工程」等のヘッダーかどうか）
-    const headerKeywords = ['工程', '工程名', 'タスク名', 'タスク', 'task', 'Task', 'TASK', '名前', '名称', 'process'];
+    // ヘッダー行の判定（最初の列が「No」「工程」等のヘッダーかどうか）
+    const headerKeywords = ['No', 'no', 'NO', '工程', '工程名', 'タスク名', 'タスク', 'task', 'Task', 'TASK', '名前', '名称', 'process'];
     const firstCol = isTabSeparated ? firstLine.split('\t')[0] : parseCSVLine(firstLine)[0];
-    const hasHeader = headerKeywords.some(keyword => firstCol.trim().toLowerCase().includes(keyword.toLowerCase()));
+    const hasHeader = headerKeywords.some(keyword => firstCol.trim().toLowerCase() === keyword.toLowerCase());
 
     // ヘッダー行がある場合はスキップ
     const dataLines = hasHeader ? lines.slice(1) : lines;
@@ -1320,25 +1464,26 @@ async function executeImport() {
 
     dataLines.forEach((line, index) => {
         const cols = isTabSeparated ? line.split('\t') : parseCSVLine(line);
-        if (cols.length < 2 || !cols[1]?.trim()) return; // タスク名（2列目）が必須
+        if (cols.length < 3 || !cols[2]?.trim()) return; // タスク名（3列目）が必須
 
-        // 全16列に対応（テーブル列順序: 工程, タスク名, 担当者, ステータス, 営業工数, 予定工数, 予定開始日, 予定終了日, 予定原価, 実績工数, 実績開始日, 実績終了日, 出来高, 進捗率, 備考, 親タスク）
-        const processName = cols[0]?.trim() || '';
-        const taskName = cols[1]?.trim() || '';
-        const assigneeName = cols[2]?.trim() || '';
-        const statusName = cols[3]?.trim() || '';
-        const salesManDays = cols[4]?.trim() || null;
-        const plannedManDays = cols[5]?.trim() || null;
-        const plannedStart = cols[6]?.trim() || null;
-        const plannedEnd = cols[7]?.trim() || null;
-        const plannedCost = cols[8]?.trim() || null;
-        const actualManDays = cols[9]?.trim() || null;
-        const actualStart = cols[10]?.trim() || null;
-        const actualEnd = cols[11]?.trim() || null;
-        const actualCost = cols[12]?.trim() || null;
-        const progress = cols[13]?.trim() || '0';
-        const description = cols[14]?.trim() || '';
-        const parentName = cols[15]?.trim() || '';
+        // 全17列に対応（テーブル列順序: No, 工程, タスク名, 担当者, ステータス, 営業工数, 予定工数, 予定開始日, 予定終了日, 予定原価, 実績工数, 実績開始日, 実績終了日, 出来高, 進捗率, 備考, 親タスクNo）
+        const rowNo = cols[0]?.trim() || '';
+        const processName = cols[1]?.trim() || '';
+        const taskName = cols[2]?.trim() || '';
+        const assigneeName = cols[3]?.trim() || '';
+        const statusName = cols[4]?.trim() || '';
+        const salesManDays = cols[5]?.trim() || null;
+        const plannedManDays = cols[6]?.trim() || null;
+        const plannedStart = cols[7]?.trim() || null;
+        const plannedEnd = cols[8]?.trim() || null;
+        const plannedCost = cols[9]?.trim() || null;
+        const actualManDays = cols[10]?.trim() || null;
+        const actualStart = cols[11]?.trim() || null;
+        const actualEnd = cols[12]?.trim() || null;
+        const actualCost = cols[13]?.trim() || null;
+        const progress = cols[14]?.trim() || '0';
+        const description = cols[15]?.trim() || '';
+        const parentNo = cols[16]?.trim() || '';
 
         const taskData = {
             project_id: initialData.projectId,
@@ -1359,12 +1504,14 @@ async function executeImport() {
             description: description || null
         };
 
-        if (parentName) {
-            // サブタスク
-            taskData.parent_name = parentName;
-        } else {
-            // 親タスク
-            parentTaskMap[taskName] = tasksToImport.length;
+        if (parentNo) {
+            // サブタスク - 親タスクNoで参照
+            taskData.parent_no = parentNo;
+        }
+
+        // NoをキーにしてマップにIndexを保存
+        if (rowNo) {
+            parentTaskMap[rowNo] = tasksToImport.length;
         }
 
         tasksToImport.push(taskData);
@@ -1609,13 +1756,17 @@ initialData.processes.forEach((p, i) => { processOrder[p.id] = i + 1; });
 let dateEditedTaskId = null;
 let dateEditedSubtaskId = null;
 let dateEditedRows = new Set();
+let dateEditedField = 'planned_start_date'; // 編集された日付フィールド（デフォルトは開始日）
 let selectedEndTaskId = null;
 let selectedEndSubtaskId = null;
 
 // 日付編集時の処理（TaskTableRendererから呼び出し）
-function onDateEdited(taskId, subtaskId = null) {
+function onDateEdited(taskId, subtaskId = null, fieldName = null) {
     dateEditedTaskId = taskId;
     dateEditedSubtaskId = subtaskId;
+    if (fieldName && (fieldName === 'planned_start_date' || fieldName === 'planned_end_date')) {
+        dateEditedField = fieldName;
+    }
 
     // ハイライト表示
     dateEditedRows.add(`task-${taskId}`);
@@ -1623,9 +1774,7 @@ function onDateEdited(taskId, subtaskId = null) {
         dateEditedRows.add(`subtask-${subtaskId}`);
     }
     applyDateEditHighlight();
-
-    // 一括更新ボタンを表示
-    document.getElementById('bulk-date-btn').classList.remove('hidden');
+    // 一括日付ボタンはチェックボックス選択時のみ表示（updateSelectionBarで制御）
 }
 
 // ハイライトを適用
@@ -1645,6 +1794,7 @@ function clearDateEditState() {
     dateEditedTaskId = null;
     dateEditedSubtaskId = null;
     dateEditedRows.clear();
+    dateEditedField = 'planned_start_date'; // デフォルトにリセット
     document.querySelectorAll('.date-edited').forEach(el => el.classList.remove('date-edited'));
     document.getElementById('bulk-date-btn').classList.add('hidden');
 }
@@ -1653,21 +1803,43 @@ function openBulkDateModal() {
     const modal = document.getElementById('bulk-date-modal');
     modal.classList.remove('hidden');
 
-    // 開始タスクを表示（編集したタスク）
-    if (dateEditedTaskId !== null && taskListApp) {
-        const task = taskListApp.dataManager.getTaskById(dateEditedTaskId);
+    // モーダルを開く前に、全ての日付入力値をDataManagerに同期
+    // これにより、編集中の値が確実に反映される
+    syncAllDateValuesToDataManager();
+
+    // 開始タスクを表示（チェックした行の中で最も上にある行）
+    const startTaskId = window.selectedStartTaskId || dateEditedTaskId;
+
+    if (startTaskId !== null && taskListApp) {
+        const task = taskListApp.dataManager.getTaskById(startTaskId);
         if (task) {
+            // DOM入力フィールドから変更後の日付を取得（編集中の値を優先）
+            let startDate = getDateFromDom(startTaskId, 'planned_start_date') || task.planned_start_date || '未設定';
+            let endDate = getDateFromDom(startTaskId, 'planned_end_date') || task.planned_end_date || '未設定';
+
+            // 編集されたフィールドの日付を基準日として使用
+            const baseFieldLabel = dateEditedField === 'planned_end_date' ? '終了日' : '開始日';
+            const baseDate = dateEditedField === 'planned_end_date' ? endDate : startDate;
+
+            console.log('[openBulkDateModal] タスクID:', startTaskId);
+            console.log('[openBulkDateModal] 編集されたフィールド:', dateEditedField);
+            console.log('[openBulkDateModal] 基準日:', baseDate);
+
             let displayText = `${task.task_name}`;
-            if (dateEditedSubtaskId !== null) {
-                const subtask = (task.subtasks || []).find(st => st.id === dateEditedSubtaskId);
-                if (subtask) displayText += ` > ${subtask.task_name}`;
+            displayText += `\n<strong>基準日（${baseFieldLabel}）: ${baseDate}</strong>`;
+            displayText += `\n開始日: ${startDate} / 終了日: ${endDate}`;
+
+            // 選択した行数を表示
+            const selectedCount = window.selectedTaskIds ? window.selectedTaskIds.length : 1;
+            if (selectedCount > 1) {
+                displayText += ` [${selectedCount}件選択中]`;
             }
-            displayText += ` (${task.planned_start_date || '未設定'} 〜 ${task.planned_end_date || '未設定'})`;
-            document.getElementById('bulk-start-task-display').textContent = displayText;
-            document.getElementById('bulk-start-task').value = dateEditedTaskId;
+
+            document.getElementById('bulk-start-task-display').innerHTML = displayText.replace(/\n/g, '<br>');
+            document.getElementById('bulk-start-task').value = startTaskId;
         }
     } else {
-        document.getElementById('bulk-start-task-display').textContent = '-';
+        document.getElementById('bulk-start-task-display').textContent = '行をチェックして選択してください';
         document.getElementById('bulk-start-task').value = '';
     }
 
@@ -1822,6 +1994,33 @@ function calculateEndDate(startDate, manDays, excludeWeekends) {
     return addBusinessDays(startDate, daysToAdd, excludeWeekends);
 }
 
+// 終了日から開始日を逆算（工数から開始日を計算）
+function calculateStartDateFromEnd(endDate, manDays, excludeWeekends) {
+    if (!manDays || manDays <= 0) {
+        return endDate;
+    }
+    const daysToSubtract = Math.ceil(manDays) - 1;
+    if (daysToSubtract <= 0) {
+        return endDate;
+    }
+    return subtractBusinessDays(endDate, daysToSubtract, excludeWeekends);
+}
+
+// 営業日を減算（土日を除外）
+function subtractBusinessDays(endDate, days, excludeWeekends) {
+    const date = new Date(endDate);
+    let subtractedDays = 0;
+
+    while (subtractedDays < days) {
+        date.setDate(date.getDate() - 1);
+        if (!excludeWeekends || (date.getDay() !== 0 && date.getDay() !== 6)) {
+            subtractedDays++;
+        }
+    }
+
+    return date;
+}
+
 // 日付を文字列に変換
 function formatDateString(date) {
     const d = new Date(date);
@@ -1892,6 +2091,57 @@ function sortTasksForScheduling(targetTasks) {
     });
 }
 
+// DOM入力フィールドから現在の日付値を取得する関数
+function getDateFromDom(taskId, fieldName) {
+    const taskIdStr = String(taskId);
+
+    // 方法1: 全ての該当フィールドの入力を検索してタスクIDで絞り込む
+    const allInputs = document.querySelectorAll(`input[data-field="${fieldName}"]`);
+    for (const input of allInputs) {
+        if (String(input.dataset.taskId) === taskIdStr) {
+            console.log(`[getDateFromDom] 方法1で発見 - taskId: ${taskIdStr}, field: ${fieldName}, value: "${input.value}"`);
+            if (input.value) {
+                return input.value;
+            }
+        }
+    }
+
+    // 方法2: 対象の行を探してから入力を探す
+    const row = document.querySelector(`tr[data-task-id="${taskIdStr}"]`);
+    if (row) {
+        const input = row.querySelector(`input[data-field="${fieldName}"]`);
+        if (input) {
+            console.log(`[getDateFromDom] 方法2で発見 - taskId: ${taskIdStr}, field: ${fieldName}, value: "${input.value}"`);
+            if (input.value) {
+                return input.value;
+            }
+        }
+    }
+
+    console.log(`[getDateFromDom] 見つからず - taskId: ${taskIdStr}, field: ${fieldName}`);
+    return null;
+}
+
+// 全ての日付入力値をDataManagerに同期
+function syncAllDateValuesToDataManager() {
+    if (!taskListApp || !taskListApp.dataManager) return;
+
+    const dateFields = ['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'];
+    const rows = document.querySelectorAll('#task-tbody .task-row');
+
+    rows.forEach(row => {
+        dateFields.forEach(fieldName => {
+            const input = row.querySelector(`input[data-field="${fieldName}"]`);
+            if (input && input.value) {
+                const inputTaskId = input.dataset.taskId;
+                if (inputTaskId) {
+                    taskListApp.dataManager.updateTaskField(inputTaskId, fieldName, input.value);
+                }
+            }
+        });
+    });
+}
+
 // プレビュー
 function previewBulkDate() {
     const startTaskId = document.getElementById('bulk-start-task').value;
@@ -1900,10 +2150,22 @@ function previewBulkDate() {
         return;
     }
 
-    const startTask = taskListApp.dataManager.getTaskById(parseInt(startTaskId));
-    const baseDate = startTask?.planned_start_date;
+    // 最新の日付値をDataManagerに同期
+    syncAllDateValuesToDataManager();
+
+    // 編集されたフィールドの日付を基準日として使用
+    const baseField = dateEditedField || 'planned_start_date';
+    const baseFieldLabel = baseField === 'planned_end_date' ? '終了日' : '開始日';
+
+    // DOM入力フィールドから変更後の日付を取得（編集中の値を優先）
+    let baseDate = getDateFromDom(startTaskId, baseField);
     if (!baseDate) {
-        alert('開始タスクの開始日が設定されていません。');
+        // DOMに入力がない場合はdataManagerから取得
+        const startTask = taskListApp.dataManager.getTaskById(startTaskId);
+        baseDate = startTask?.[baseField];
+    }
+    if (!baseDate) {
+        alert(`開始タスクの${baseFieldLabel}が設定されていません。`);
         return;
     }
 
@@ -1916,7 +2178,7 @@ function previewBulkDate() {
     const sortedTasks = sortTasksForScheduling(targetTasks);
 
     let previewHtml = `<p class="mb-2">対象: ${sortedTasks.length}件のタスク（メンバー→工程→タスク順）</p>`;
-    previewHtml += `<p class="mb-2 text-amber-700">基準日: ${baseDate}</p>`;
+    previewHtml += `<p class="mb-2 text-amber-700">基準日（${baseFieldLabel}）: ${baseDate}</p>`;
     previewHtml += '<ul class="space-y-1">';
 
     let currentAssignee = null;
@@ -1953,12 +2215,30 @@ function executeBulkDateUpdate() {
         return;
     }
 
-    const startTask = taskListApp.dataManager.getTaskById(parseInt(startTaskId));
-    const baseDate = startTask?.planned_start_date;
+    // 最新の日付値をDataManagerに同期
+    syncAllDateValuesToDataManager();
+
+    // 編集されたフィールドの日付を基準日として使用
+    const baseField = dateEditedField || 'planned_start_date';
+    const baseFieldLabel = baseField === 'planned_end_date' ? '終了日' : '開始日';
+
+    // DOM入力フィールドから変更後の日付を取得（編集中の値を優先）
+    let baseDate = getDateFromDom(startTaskId, baseField);
+    console.log(`[executeBulkDateUpdate] 基準フィールド: ${baseField}`);
+    console.log(`[executeBulkDateUpdate] DOM ${baseFieldLabel}:`, baseDate);
+
     if (!baseDate) {
-        alert('開始タスクの開始日が設定されていません。');
+        // DOMに入力がない場合はdataManagerから取得
+        const startTask = taskListApp.dataManager.getTaskById(startTaskId);
+        baseDate = startTask?.[baseField];
+        console.log(`[executeBulkDateUpdate] DataManager ${baseFieldLabel}:`, baseDate);
+    }
+    if (!baseDate) {
+        alert(`開始タスクの${baseFieldLabel}が設定されていません。`);
         return;
     }
+
+    console.log('[executeBulkDateUpdate] 使用する基準日:', baseDate);
 
     const excludeWeekends = document.getElementById('bulk-exclude-weekends').checked;
     const targetTasks = getTargetTasks();
@@ -1973,6 +2253,8 @@ function executeBulkDateUpdate() {
     // メンバーごとの現在の日付を管理
     let memberCurrentDate = {};
     const baseDateObj = adjustToBusinessDay(new Date(baseDate), excludeWeekends);
+    const isEndDateBase = (baseField === 'planned_end_date');
+    let isFirstTask = true;
 
     sortedTasks.forEach(item => {
         const task = item.task;
@@ -1980,7 +2262,29 @@ function executeBulkDateUpdate() {
 
         // メンバーが変わったら基準日にリセット
         if (!memberCurrentDate[assignee]) {
-            memberCurrentDate[assignee] = new Date(baseDateObj);
+            // 終了日基準の場合、最初のタスクは終了日を固定し、翌日から次のタスクを開始
+            if (isEndDateBase && isFirstTask) {
+                // 最初のタスク：基準日を終了日として使用し、開始日を逆算
+                const endDate = new Date(baseDateObj);
+                const startDate = calculateStartDateFromEnd(endDate, task.planned_man_days, excludeWeekends);
+
+                taskListApp.dataManager.updateTask(task.id, {
+                    planned_start_date: formatDateString(startDate),
+                    planned_end_date: formatDateString(endDate)
+                });
+
+                // 次のタスクは終了日の翌日から開始
+                const nextDate = new Date(endDate);
+                nextDate.setDate(nextDate.getDate() + 1);
+                memberCurrentDate[assignee] = nextDate;
+                isFirstTask = false;
+
+                // ハイライト対象に追加
+                dateEditedRows.add(`task-${task.id}`);
+                return; // このタスクの処理は完了
+            } else {
+                memberCurrentDate[assignee] = new Date(baseDateObj);
+            }
         }
 
         let currentDate = memberCurrentDate[assignee];

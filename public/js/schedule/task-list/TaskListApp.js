@@ -19,10 +19,10 @@ class TaskListApp {
         this.isEditMode = false;
         this.activeFilters = {
             process: '',
-            assignee: '',
+            taskName: '',
+            assigneeName: '',
             status: '',
-            delay: '',
-            search: ''
+            delay: ''
         };
 
         // コンポーネント
@@ -61,14 +61,19 @@ class TaskListApp {
             // モード切り替え
             viewModeBtn: document.getElementById('btn-view-mode'),
             editModeBtn: document.getElementById('btn-edit-mode'),
-            editActions: document.getElementById('edit-actions'),
-            viewActions: document.getElementById('view-actions'),
+            viewModeIndicator: document.getElementById('view-mode-indicator'),
+            editModeIndicator: document.getElementById('edit-mode-indicator'),
+            // 編集モード時のボタン
+            undoBtn: document.getElementById('undo-btn'),
+            cancelEditBtn: document.getElementById('cancel-edit-btn'),
+            saveAllBtn: document.getElementById('save-all-btn'),
+            bulkDateBtn: document.getElementById('bulk-date-btn'),
 
             // 検索・フィルター
-            searchInput: document.getElementById('search-input'),
             searchPanel: document.getElementById('search-panel'),
             searchToggle: document.getElementById('search-toggle'),
-            filterAssignee: document.getElementById('filter-assignee'),
+            filterTaskName: document.getElementById('filter-input-taskName'),
+            filterAssigneeSearch: document.getElementById('filter-search-assigneeName'),
             filterStatus: document.getElementById('filter-status'),
             filterProcess: document.getElementById('filter-process'),
 
@@ -206,16 +211,15 @@ class TaskListApp {
             this.elements.searchToggle.addEventListener('click', () => this.toggleSearchPanel());
         }
 
-        // 検索入力
-        if (this.elements.searchInput) {
-            this.elements.searchInput.addEventListener('keyup', (e) => {
-                this.activeFilters.search = e.target.value.toLowerCase();
-                this.applyFilters();
-            });
-        }
+        // テキストフィルター（タスク名、担当者名）
+        ['filterTaskName', 'filterAssigneeName'].forEach(key => {
+            if (this.elements[key]) {
+                this.elements[key].addEventListener('input', () => this.applyPanelFilters());
+            }
+        });
 
-        // パネルフィルター
-        ['filterAssignee', 'filterStatus', 'filterProcess'].forEach(key => {
+        // セレクトフィルター（ステータス、工程）
+        ['filterStatus', 'filterProcess'].forEach(key => {
             if (this.elements[key]) {
                 this.elements[key].addEventListener('change', () => this.applyPanelFilters());
             }
@@ -230,14 +234,8 @@ class TaskListApp {
         }
 
         // ヘッダーフィルタードロップダウン
-        document.querySelectorAll('.header-filter').forEach(header => {
-            header.addEventListener('click', (e) => this.toggleHeaderFilter(e));
-        });
-
-        // フィルタードロップダウンのアイテム
-        document.querySelectorAll('.filter-dropdown-item').forEach(item => {
-            item.addEventListener('click', (e) => this.selectHeaderFilter(e));
-        });
+        // 注: イベントはtask_list.phpのグローバル関数で処理されるため、ここでは登録しない
+        // これにより二重登録を防ぐ
 
         // ドキュメント全体のクリック（メニューを閉じる）
         document.addEventListener('click', (e) => {
@@ -297,20 +295,27 @@ class TaskListApp {
 
         if (this.elements.viewModeBtn && this.elements.editModeBtn) {
             if (this.isEditMode) {
-                this.elements.viewModeBtn.className = 'px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border-r border-slate-300';
-                this.elements.editModeBtn.className = 'px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600';
+                this.elements.viewModeBtn.classList.remove('active');
+                this.elements.editModeBtn.classList.add('active');
             } else {
-                this.elements.viewModeBtn.className = 'px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600';
-                this.elements.editModeBtn.className = 'px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 border-l border-slate-300';
+                this.elements.viewModeBtn.classList.add('active');
+                this.elements.editModeBtn.classList.remove('active');
             }
         }
 
-        if (this.elements.editActions) {
-            this.elements.editActions.classList.toggle('hidden', !this.isEditMode);
+        // モードインジケーターの切り替え
+        if (this.elements.viewModeIndicator) {
+            this.elements.viewModeIndicator.classList.toggle('hidden', this.isEditMode);
         }
-        if (this.elements.viewActions) {
-            this.elements.viewActions.classList.toggle('hidden', this.isEditMode);
+        if (this.elements.editModeIndicator) {
+            this.elements.editModeIndicator.classList.toggle('hidden', !this.isEditMode);
         }
+
+        // 編集モード時のボタン表示切り替え
+        const editButtons = [this.elements.undoBtn, this.elements.cancelEditBtn, this.elements.saveAllBtn];
+        editButtons.forEach(btn => {
+            if (btn) btn.classList.toggle('hidden', !this.isEditMode);
+        });
 
         // 表示モードに切り替え時、選択状態と選択バーをクリア
         if (!this.isEditMode) {
@@ -400,12 +405,13 @@ class TaskListApp {
      * パネルフィルターを適用
      */
     applyPanelFilters() {
-        this.activeFilters.assignee = this.elements.filterAssignee?.value || '';
+        this.activeFilters.taskName = this.elements.filterTaskName?.value || '';
+        // assigneeNameはドロップダウン選択で設定されるため、ここでは更新しない
         this.activeFilters.status = this.elements.filterStatus?.value || '';
         this.activeFilters.process = this.elements.filterProcess?.value || '';
 
         // ヘッダーのスタイル更新
-        ['process', 'assignee', 'status'].forEach(type => {
+        ['process', 'status', 'taskName', 'assigneeName'].forEach(type => {
             const header = document.querySelector(`th[data-filter-type="${type}"]`);
             if (header) {
                 header.classList.toggle('has-filter', !!this.activeFilters[type]);
@@ -440,33 +446,33 @@ class TaskListApp {
      * フィルター件数を更新
      */
     updateFilterCount() {
-        const visibleRows = document.querySelectorAll('#task-tbody .task-row:not([style*="display: none"])');
-        const totalRows = document.querySelectorAll('#task-tbody .task-row');
-
-        if (visibleRows.length < totalRows.length) {
-            this.showToast(`${visibleRows.length}件表示中（全${totalRows.length}件）`, 'info');
-        }
+        // フィルター時のトースト通知は不要
     }
 
     /**
      * フィルターをクリア
      */
     clearFilter() {
-        this.activeFilters = { process: '', assignee: '', status: '', delay: '', search: '' };
+        this.activeFilters = { process: '', taskName: '', assigneeName: '', status: '', delay: '' };
 
         // UIをリセット
         document.querySelectorAll('#search-panel select').forEach(el => el.selectedIndex = 0);
-        if (this.elements.searchInput) {
-            this.elements.searchInput.value = '';
-        }
+        document.querySelectorAll('#search-panel input[type="text"]').forEach(el => el.value = '');
+
+        // ヘッダーフィルタのテキスト入力もリセット
+        const taskNameInput = document.getElementById('filter-input-taskName');
+        if (taskNameInput) taskNameInput.value = '';
+
+        // 担当者フィルタの検索ボックスとオプションをリセット
+        const assigneeSearchInput = document.getElementById('filter-search-assigneeName');
+        if (assigneeSearchInput) assigneeSearchInput.value = '';
+        document.querySelectorAll('#assignee-options-container .assignee-option').forEach(el => el.classList.remove('hidden'));
 
         // ヘッダーのスタイルをリセット
         document.querySelectorAll('.header-filter').forEach(h => h.classList.remove('has-filter'));
 
         // 全行表示
         this.tableRenderer.showAllRows();
-
-        this.showToast('フィルターをクリアしました', 'info');
     }
 
     // ========== 選択管理 ==========
@@ -494,6 +500,47 @@ class TaskListApp {
         if (this.elements.selectedCount) {
             this.elements.selectedCount.textContent = count;
         }
+
+        // フッターの一括日付更新ボタンの表示制御
+        const bulkDateBtn = document.getElementById('bulk-date-btn');
+        if (bulkDateBtn) {
+            if (this.isEditMode && count > 0) {
+                bulkDateBtn.classList.remove('hidden');
+                // 選択した行の情報をグローバルに保持
+                this.updateSelectedTaskForBulkDate(selectedIds);
+            } else {
+                bulkDateBtn.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * 一括日付更新用に選択タスク情報を更新
+     */
+    updateSelectedTaskForBulkDate(selectedIds) {
+        if (selectedIds.length === 0) return;
+
+        // 選択した行の中で最も上にある行を取得
+        const allRows = Array.from(document.querySelectorAll('#task-tbody .task-row'));
+        let firstSelectedIndex = allRows.length;
+        let firstSelectedId = null;
+
+        selectedIds.forEach(id => {
+            const row = document.querySelector(`tr[data-task-id="${id}"]`);
+            if (row) {
+                const index = allRows.indexOf(row);
+                if (index !== -1 && index < firstSelectedIndex) {
+                    firstSelectedIndex = index;
+                    firstSelectedId = id;
+                }
+            }
+        });
+
+        // グローバル変数に設定（task_list.phpのopenBulkDateModalで使用）
+        if (typeof window.selectedStartTaskId !== 'undefined' || firstSelectedId !== null) {
+            window.selectedStartTaskId = firstSelectedId;
+            window.selectedTaskIds = selectedIds;
+        }
     }
 
     /**
@@ -504,6 +551,9 @@ class TaskListApp {
         if (this.elements.selectAll) {
             this.elements.selectAll.checked = false;
         }
+        // グローバル変数もクリア
+        window.selectedStartTaskId = null;
+        window.selectedTaskIds = [];
         this.updateSelectionBar();
     }
 
@@ -704,21 +754,63 @@ class TaskListApp {
         const bulkStatus = document.getElementById('bulk-status')?.value;
         const bulkProgress = document.getElementById('bulk-progress')?.value;
         const bulkProcess = document.getElementById('bulk-process')?.value;
+        const bulkPlannedStart = document.getElementById('bulk-planned-start')?.value;
+        const bulkPlannedEnd = document.getElementById('bulk-planned-end')?.value;
+        const bulkActualStart = document.getElementById('bulk-actual-start')?.value;
+        const bulkActualEnd = document.getElementById('bulk-actual-end')?.value;
+        const updateSubsequent = document.getElementById('bulk-update-subsequent')?.checked;
 
         if (bulkAssignee) updates.assignee_id = bulkAssignee;
         if (bulkStatus) updates.status = bulkStatus;
         if (bulkProgress) updates.progress = parseInt(bulkProgress);
         if (bulkProcess) updates.process_id = bulkProcess;
+        if (bulkPlannedStart) updates.planned_start_date = bulkPlannedStart;
+        if (bulkPlannedEnd) updates.planned_end_date = bulkPlannedEnd;
+        if (bulkActualStart) updates.actual_start_date = bulkActualStart;
+        if (bulkActualEnd) updates.actual_end_date = bulkActualEnd;
 
         if (Object.keys(updates).length === 0) {
             this.showToast('変更する項目を選択してください', 'warning');
             return;
         }
 
-        this.dataManager.bulkUpdate(selectedIds, updates);
+        // 選択行以降すべて更新する場合
+        let targetIds = selectedIds;
+        if (updateSubsequent && selectedIds.length > 0) {
+            targetIds = this.getSubsequentTaskIds(selectedIds);
+        }
+
+        this.dataManager.bulkUpdate(targetIds, updates);
         this.render();
         this.closeBulkEditModal();
         this.clearSelection();
+
+        // 日付入力フィールドをリセット
+        document.getElementById('bulk-planned-start').value = '';
+        document.getElementById('bulk-planned-end').value = '';
+        document.getElementById('bulk-actual-start').value = '';
+        document.getElementById('bulk-actual-end').value = '';
+        document.getElementById('bulk-update-subsequent').checked = false;
+    }
+
+    /**
+     * 選択行以降のタスクIDを取得
+     */
+    getSubsequentTaskIds(selectedIds) {
+        const allRows = Array.from(document.querySelectorAll('#task-tbody .task-row'));
+        const allTaskIds = allRows.map(row => row.dataset.taskId);
+
+        // 選択されたタスクの中で最も上にある行のインデックスを取得
+        let minIndex = allTaskIds.length;
+        selectedIds.forEach(id => {
+            const index = allTaskIds.indexOf(String(id));
+            if (index !== -1 && index < minIndex) {
+                minIndex = index;
+            }
+        });
+
+        // その行以降のすべてのタスクIDを返す
+        return allTaskIds.slice(minIndex).map(id => parseInt(id) || id);
     }
 
     /**

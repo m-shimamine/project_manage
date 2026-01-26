@@ -86,3 +86,13 @@ $routes->group('api/tasks', function ($routes) {
     $routes->post('(:num)/copy', 'Api\TaskApiController::copy/$1');                // タスクコピー
     $routes->get('(:num)/history', 'Api\TaskApiController::history/$1');           // 履歴取得
 });
+
+// タスク作業履歴API（Ajax用）
+$routes->group('api/task-histories', function ($routes) {
+    $routes->get('/', 'Api\TaskWorkLogApiController::index');             // 作業履歴一覧取得
+    $routes->get('stats', 'Api\TaskWorkLogApiController::stats');         // 作業統計取得
+    $routes->get('(:num)', 'Api\TaskWorkLogApiController::show/$1');      // 作業履歴詳細取得
+    $routes->post('/', 'Api\TaskWorkLogApiController::create');           // 作業履歴作成
+    $routes->put('(:num)', 'Api\TaskWorkLogApiController::update/$1');    // 作業履歴更新
+    $routes->delete('(:num)', 'Api\TaskWorkLogApiController::delete/$1'); // 作業履歴削除
+});

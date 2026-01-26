@@ -31,6 +31,20 @@ class TaskTableRenderer {
             on_hold: { class: 'status-on-hold', label: '保留' }
         };
 
+        // 担当者カラー設定
+        this.assigneeColors = {};
+        this.colorPalette = [
+            'from-blue-400 to-indigo-500',
+            'from-purple-400 to-pink-500',
+            'from-cyan-400 to-blue-500',
+            'from-orange-400 to-red-500',
+            'from-teal-400 to-cyan-500',
+            'from-emerald-400 to-green-500',
+            'from-rose-400 to-pink-500',
+            'from-amber-400 to-orange-500'
+        ];
+        this.colorIndex = 0;
+
         // コールバック
         this.onRowClick = options.onRowClick || null;
         this.onRowContextMenu = options.onRowContextMenu || null;
@@ -96,11 +110,14 @@ class TaskTableRenderer {
                 <td class="px-2 py-2 text-center text-xs text-slate-500 border-r border-slate-100">${rowNo}</td>
                 <td class="px-2 py-2 text-xs border-r border-slate-100">${this.escapeHtml(task.process_name || '')}</td>
                 <td class="px-2 py-2 border-r border-slate-100">
-                    <a href="javascript:void(0)" class="task-name-link text-sm text-slate-800 hover:text-blue-600 font-medium" data-task-id="${task.id}">
-                        ${this.escapeHtml(task.task_name)}
-                    </a>
+                    <div class="flex items-center">
+                        ${this.createTaskIcon(false)}
+                        <a href="javascript:void(0)" class="task-name-link text-sm text-slate-800 hover:text-blue-600 font-medium" data-task-id="${task.id}">
+                            ${this.escapeHtml(task.task_name)}
+                        </a>
+                    </div>
                 </td>
-                <td class="px-2 py-2 text-center text-xs border-r border-slate-100">${this.escapeHtml(task.assignee_name || '-')}</td>
+                <td class="px-2 py-2 text-center text-xs border-r border-slate-100">${this.createAssigneeHtml(task.assignee_name)}</td>
                 <td class="px-2 py-2 text-center border-r border-slate-100">
                     <span class="status-badge ${statusConfig.class}">${statusConfig.label}</span>
                 </td>
@@ -262,13 +279,13 @@ class TaskTableRenderer {
                 <td class="px-2 py-2 text-xs text-slate-400 border-r border-slate-100">${this.escapeHtml(subtask.process_name || '')}</td>
                 <td class="px-2 py-2 border-r border-slate-100">
                     <div class="flex items-center pl-4">
-                        <span class="text-slate-400 mr-1 flex-shrink-0">└</span>
+                        ${this.createTaskIcon(true)}
                         <a href="javascript:void(0)" class="task-name-link text-sm text-slate-600 hover:text-blue-600" data-task-id="${subtask.id}">
                             ${this.escapeHtml(subtask.task_name)}
                         </a>
                     </div>
                 </td>
-                <td class="px-2 py-2 text-center text-xs border-r border-slate-100">${this.escapeHtml(subtask.assignee_name || '-')}</td>
+                <td class="px-2 py-2 text-center text-xs border-r border-slate-100">${this.createAssigneeHtml(subtask.assignee_name)}</td>
                 <td class="px-2 py-2 text-center border-r border-slate-100">
                     <span class="status-badge ${statusConfig.class}">${statusConfig.label}</span>
                 </td>
@@ -318,6 +335,20 @@ class TaskTableRenderer {
         const checkbox = row.querySelector('.task-checkbox');
         if (checkbox && this.onCheckboxChange) {
             checkbox.addEventListener('change', () => {
+                // チェックボックスクリック前に、同じ行の日付入力値をDataManagerに保存
+                // これにより、日付編集後にチェックを入れても値が失われない
+                if (this.isEditMode && this.dataManager) {
+                    const dateFields = ['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'];
+                    dateFields.forEach(fieldName => {
+                        const input = row.querySelector(`input[data-field="${fieldName}"]`);
+                        if (input && input.value) {
+                            const inputTaskId = input.dataset.taskId;
+                            if (inputTaskId) {
+                                this.dataManager.updateTaskField(inputTaskId, fieldName, input.value);
+                            }
+                        }
+                    });
+                }
                 this.onCheckboxChange(task.id, checkbox.checked);
             });
         }
@@ -334,38 +365,47 @@ class TaskTableRenderer {
         if (this.isEditMode) {
             const editInputs = row.querySelectorAll('.edit-input');
             const parentId = row.dataset.parentId; // サブタスクの場合、行に設定されている親タスクID
+
+            const handleFieldChange = (e) => {
+                const field = e.target.dataset.field;
+                const taskId = e.target.dataset.taskId;
+                let value = e.target.value;
+
+                // 数値フィールドの変換
+                if (['sales_man_days', 'planned_man_days', 'actual_man_days', 'progress', 'planned_cost', 'actual_cost'].includes(field)) {
+                    value = value === '' ? null : parseFloat(value);
+                }
+
+                // コールバック呼び出し
+                if (this.onFieldChange) {
+                    this.onFieldChange(taskId, field, value);
+                }
+
+                // DataManager を直接更新
+                if (this.dataManager) {
+                    this.dataManager.updateTaskField(taskId, field, value);
+                }
+
+                // 日付フィールドの場合、一括日付更新機能に通知（フィールド名も渡す）
+                if (['planned_start_date', 'planned_end_date'].includes(field) && typeof window.onDateEdited === 'function') {
+                    if (parentId) {
+                        // サブタスクの場合
+                        window.onDateEdited(parseInt(parentId), parseInt(taskId), field);
+                    } else {
+                        // 親タスクの場合
+                        window.onDateEdited(parseInt(taskId), null, field);
+                    }
+                }
+            };
+
             editInputs.forEach(input => {
-                input.addEventListener('change', (e) => {
-                    const field = e.target.dataset.field;
-                    const taskId = e.target.dataset.taskId;
-                    let value = e.target.value;
+                input.addEventListener('change', handleFieldChange);
 
-                    // 数値フィールドの変換
-                    if (['sales_man_days', 'planned_man_days', 'actual_man_days', 'progress', 'planned_cost', 'actual_cost'].includes(field)) {
-                        value = value === '' ? null : parseFloat(value);
-                    }
-
-                    // コールバック呼び出し
-                    if (this.onFieldChange) {
-                        this.onFieldChange(taskId, field, value);
-                    }
-
-                    // DataManager を直接更新
-                    if (this.dataManager) {
-                        this.dataManager.updateTaskField(taskId, field, value);
-                    }
-
-                    // 日付フィールドの場合、一括日付更新機能に通知
-                    if (['planned_start_date', 'planned_end_date'].includes(field) && typeof window.onDateEdited === 'function') {
-                        if (parentId) {
-                            // サブタスクの場合
-                            window.onDateEdited(parseInt(parentId), parseInt(taskId));
-                        } else {
-                            // 親タスクの場合
-                            window.onDateEdited(parseInt(taskId), null);
-                        }
-                    }
-                });
+                // 日付フィールドはinputイベントでも即時更新
+                const field = input.dataset.field;
+                if (['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'].includes(field)) {
+                    input.addEventListener('input', handleFieldChange);
+                }
             });
         }
     }
@@ -455,14 +495,49 @@ class TaskTableRenderer {
      */
     createDelayBadge(delayDays) {
         if (!delayDays || delayDays === 0) {
-            return '<span class="text-slate-400 text-xs">-</span>';
+            return '<span class="delay-badge delay-ontime">予定通り</span>';
         }
 
         if (delayDays > 0) {
-            return `<span class="delay-badge delay-late">${delayDays}日遅</span>`;
+            return `<span class="delay-badge delay-late">${delayDays}日遅れ</span>`;
         } else {
-            return `<span class="delay-badge delay-early">${Math.abs(delayDays)}日先</span>`;
+            return `<span class="delay-badge delay-early">${Math.abs(delayDays)}日先行</span>`;
         }
+    }
+
+    /**
+     * 担当者のカラーを取得
+     */
+    getAssigneeColor(assigneeName) {
+        if (!assigneeName || assigneeName === '-') return 'from-gray-400 to-gray-500';
+        if (!this.assigneeColors[assigneeName]) {
+            this.assigneeColors[assigneeName] = this.colorPalette[this.colorIndex % this.colorPalette.length];
+            this.colorIndex++;
+        }
+        return this.assigneeColors[assigneeName];
+    }
+
+    /**
+     * 担当者表示HTMLを生成（カラー付き丸アイコン）
+     */
+    createAssigneeHtml(assigneeName) {
+        if (!assigneeName || assigneeName === '-') {
+            return '<span class="text-slate-500 text-xs">-</span>';
+        }
+        const color = this.getAssigneeColor(assigneeName);
+        return `<div class="flex items-center justify-center">
+            <div class="w-5 h-5 rounded-full bg-gradient-to-br ${color} mr-1 flex-shrink-0"></div>
+            <span class="text-xs text-slate-600 truncate">${this.escapeHtml(assigneeName)}</span>
+        </div>`;
+    }
+
+    /**
+     * タスクアイコンを生成
+     */
+    createTaskIcon(isSubtask) {
+        return isSubtask
+            ? '<i class="fas fa-caret-right text-blue-500 mr-2"></i>'
+            : '<i class="fas fa-clipboard-list text-blue-500 mr-2"></i>';
     }
 
     /**
@@ -518,6 +593,23 @@ class TaskTableRenderer {
      * 全選択/全解除
      */
     setAllSelection(selected) {
+        // 選択前に全ての日付入力値をDataManagerに保存
+        if (this.isEditMode && this.dataManager) {
+            const dateFields = ['planned_start_date', 'planned_end_date', 'actual_start_date', 'actual_end_date'];
+            const rows = this.tableBody.querySelectorAll('.task-row');
+            rows.forEach(row => {
+                dateFields.forEach(fieldName => {
+                    const input = row.querySelector(`input[data-field="${fieldName}"]`);
+                    if (input && input.value) {
+                        const inputTaskId = input.dataset.taskId;
+                        if (inputTaskId) {
+                            this.dataManager.updateTaskField(inputTaskId, fieldName, input.value);
+                        }
+                    }
+                });
+            });
+        }
+
         const checkboxes = this.tableBody.querySelectorAll('.task-checkbox');
         checkboxes.forEach(cb => {
             cb.checked = selected;
@@ -636,7 +728,10 @@ class TaskTableRenderer {
     formatDate(dateStr) {
         if (!dateStr) return '-';
         const date = new Date(dateStr);
-        return `${date.getMonth() + 1}/${date.getDate()}`;
+        const yy = String(date.getFullYear()).slice(-2);
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        return `${yy}/${mm}/${dd}`;
     }
 
     /**
