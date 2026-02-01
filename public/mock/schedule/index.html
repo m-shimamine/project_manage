@@ -1671,7 +1671,7 @@
         // 定数
         var CELL_WIDTH = 40;
         var WEEKDAY_NAMES = ['日', '月', '火', '水', '木', '金', '土'];
-        var TODAY = new Date(2024, 3, 10); // 2024年4月10日（モック用）
+        var TODAY = new Date(); // 本日の日付を使用
 
         // 担当者カラー設定
         var ASSIGNEE_COLORS = {
@@ -1681,6 +1681,75 @@
             '田中': 'from-orange-400 to-red-500',
             '高橋': 'from-teal-400 to-cyan-500'
         };
+
+        // 日付文字列(MM/DD)をDateオブジェクトに変換（TODAYの年を基準）
+        function parseDateString(dateStr) {
+            if (!dateStr || dateStr === '-') return null;
+            var parts = dateStr.split('/');
+            if (parts.length !== 2) return null;
+            var month = parseInt(parts[0], 10) - 1; // 0-indexed
+            var day = parseInt(parts[1], 10);
+            return new Date(TODAY.getFullYear(), month, day);
+        }
+
+        // 遅延を計算する関数
+        function calculateDelay(task) {
+            var planEnd = parseDateString(task.planEnd);
+            var planStart = parseDateString(task.planStart);
+            var actualEnd = parseDateString(task.actualEnd);
+            var progress = parseInt(task.progress, 10) || 0;
+
+            // 完了タスク（progress = 100）
+            if (progress === 100) {
+                if (actualEnd && planEnd) {
+                    var diffDays = Math.round((actualEnd - planEnd) / (1000 * 60 * 60 * 24));
+                    if (diffDays < 0) {
+                        return { type: 'ahead', text: Math.abs(diffDays) + '日先行' };
+                    } else if (diffDays > 0) {
+                        return { type: 'late', text: diffDays + '日遅れ' };
+                    } else {
+                        return { type: 'ontime', text: '予定通り' };
+                    }
+                }
+                return { type: 'ontime', text: '予定通り' };
+            }
+
+            // 進行中タスク（0 < progress < 100）
+            if (progress > 0 && progress < 100) {
+                if (planEnd) {
+                    var diffDays = Math.round((TODAY - planEnd) / (1000 * 60 * 60 * 24));
+                    if (diffDays > 0) {
+                        return { type: 'late', text: diffDays + '日遅れ' };
+                    } else if (diffDays < 0) {
+                        return { type: 'ontime', text: '予定通り' };
+                    } else {
+                        return { type: 'ontime', text: '予定通り' };
+                    }
+                }
+                return { type: 'ontime', text: '-' };
+            }
+
+            // 未開始タスク（progress = 0）
+            if (progress === 0) {
+                if (planStart) {
+                    var diffDays = Math.round((TODAY - planStart) / (1000 * 60 * 60 * 24));
+                    if (diffDays > 0) {
+                        // 予定開始日を過ぎている
+                        return { type: 'late', text: diffDays + '日遅れ' };
+                    }
+                }
+                return { type: 'ontime', text: '-' };
+            }
+
+            return { type: 'ontime', text: '-' };
+        }
+
+        // 全タスクの遅延を再計算
+        function recalculateAllDelays(tasks) {
+            tasks.forEach(function(task) {
+                task.delay = calculateDelay(task);
+            });
+        }
 
         // タスクデータ（動的生成用）- no: 表示番号, group: グループ（同じグループ内で順番が連動）
         var taskData = [
@@ -2721,6 +2790,13 @@
             // TASK_DATAの日付をtaskDataに同期（ガントチャートとタスクリストの日付を一致させる）
             syncDatesFromGanttData();
 
+            // 画面ロード時に本日を起点として遅延を再計算
+            recalculateAllDelays(taskData);
+            recalculateAllDelays(allProjectsTaskData);
+            // 遅延計算後にバックアップデータも更新
+            singleProjectTaskData = JSON.parse(JSON.stringify(taskData));
+            originalTaskData = JSON.parse(JSON.stringify(taskData));
+
             generateMonthSelect();
             generateCalendarHeaders();
             generateTaskList();
@@ -2995,10 +3071,17 @@
             }
 
             // taskDataも更新（親タスク日付計算用）
-            var task = taskData.find(function(t) { return t.id === taskId; });
+            var task = taskData.find(function(t) { return String(t.id) === String(taskId); });
             if (task) {
                 task.planStart = formattedStart;
                 task.planEnd = formattedEnd;
+                // 遅延を再計算（本日を起点として）
+                task.delay = calculateDelay(task);
+                // 遅延バッジを更新
+                if ($row.length) {
+                    var delayBadgeClass = 'delay-' + task.delay.type;
+                    $row.find('.delay-badge').removeClass('delay-late delay-ahead delay-ontime').addClass(delayBadgeClass).text(task.delay.text);
+                }
             }
         }
 
@@ -4062,6 +4145,8 @@
                     if (data.manDays) task.manDays = parseFloat(data.manDays);
                     if (data.cost) task.cost = parseFloat(data.cost) / 1000; // 円→万円
                     task.progress = parseInt(data.progress) || 0;
+                    // 遅延を再計算（本日を起点として）
+                    task.delay = calculateDelay(task);
 
                     modifiedTaskIds.add(taskId);
 
@@ -4193,6 +4278,8 @@
                 progress: 0,
                 delay: { type: 'ontime', text: '-' }
             };
+            // 遅延を計算（本日を起点として）
+            newTask.delay = calculateDelay(newTask);
 
             // taskDataに追加（工程の後、適切な位置に挿入）
             var insertIndex = taskData.findIndex(function(t) { return t.id === processId; });
@@ -4674,24 +4761,11 @@
                 // 終了日 = 開始日 + 工数 - 1（営業日ベース）
                 var nextEndDate = addBusinessDays(nextStartDate, taskDays - 1);
 
-                // 遅延日数を計算（元の終了日と比較）
-                var originalEnd = parseDisplayDate(task.planEnd);
-                var delayDays = 0;
-                if (originalEnd) {
-                    delayDays = Math.ceil((nextEndDate - originalEnd) / (1000 * 60 * 60 * 24));
-                }
-
                 task.planStart = formatDateForDisplay(nextStartDate);
                 task.planEnd = formatDateForDisplay(nextEndDate);
 
-                // 遅延情報を更新
-                if (delayDays > 0) {
-                    task.delay = { type: 'late', text: delayDays + '日遅れ' };
-                } else if (delayDays < 0) {
-                    task.delay = { type: 'ahead', text: Math.abs(delayDays) + '日先行' };
-                } else {
-                    task.delay = { type: 'ontime', text: '予定通り' };
-                }
+                // 遅延情報を更新（本日を起点として再計算）
+                task.delay = calculateDelay(task);
 
                 modifiedTaskIds.add(task.id);
                 currentEndDate = nextEndDate;
@@ -5186,6 +5260,9 @@
                 }
             });
 
+            // 遅延を再計算（本日を起点として）
+            recalculateAllDelays(taskData);
+
             // 再描画
             generateTaskList();
             generateGanttChart();
@@ -5426,6 +5503,8 @@
             if (newTasks.length > 0) {
                 taskData = taskData.concat(newTasks);
                 newTasks.forEach(function(t) { modifiedTaskIds.add(t.id); });
+                // 遅延を再計算（本日を起点として）
+                recalculateAllDelays(taskData);
                 generateTaskList();
                 generateGanttChart();
                 alert(newTasks.length + '件のタスクを追加しました。');
@@ -5483,6 +5562,8 @@
                 if (newTasks.length > 0) {
                     taskData = taskData.concat(newTasks);
                     newTasks.forEach(function(t) { modifiedTaskIds.add(t.id); });
+                    // 遅延を再計算（本日を起点として）
+                    recalculateAllDelays(taskData);
                     generateTaskList();
                     generateGanttChart();
                     alert(newTasks.length + '件のタスクをインポートしました。');
@@ -5538,6 +5619,8 @@
                 delay: { type: 'none', text: '-', days: 0 },
                 group: ''
             };
+            // 遅延を計算（本日を起点として）
+            newTask.delay = calculateDelay(newTask);
             taskData.push(newTask);
             modifiedTaskIds.add(newTask.id);
             generateTaskList();

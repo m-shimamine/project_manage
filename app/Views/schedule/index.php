@@ -1122,9 +1122,11 @@
     const endDate = currentMode === 'plan' ? task.planned_end_date : task.actual_end_date;
     const manDays = currentMode === 'plan' ? task.planned_man_days : task.actual_man_days;
     const cost = currentMode === 'plan' ? task.planned_cost : task.actual_cost;
-    const delayDays = task.delay_days || 0;
     const indent = isSubtask ? 'pl-6' : '';
     const rowClass = isSubtask ? 'subtask' : '';
+
+    // 遅延日数を本日基準でクライアント側で計算（初期表示と編集後で統一）
+    const delayDays = calculateTaskDelayDays(task);
 
     // タスクアイコン（親: clipboard-list、サブタスク: caret-right）
     const taskIcon = isSubtask
@@ -1132,14 +1134,7 @@
       : '<i class="fas fa-clipboard-list text-blue-500 mr-2"></i>';
 
     // 遅延バッジ
-    let delayBadge = '';
-    if (delayDays > 0) {
-      delayBadge = `<span class="delay-badge delay-late">${delayDays}日遅れ</span>`;
-    } else if (delayDays < 0) {
-      delayBadge = `<span class="delay-badge delay-ahead">${Math.abs(delayDays)}日先行</span>`;
-    } else {
-      delayBadge = `<span class="delay-badge delay-ontime">予定通り</span>`;
-    }
+    const delayBadge = renderDelayBadge(delayDays);
 
     // 担当者表示（カラー付き丸アイコン）
     const assigneeName = task.assignee_name || '-';
@@ -1217,16 +1212,20 @@
 
       const progress = task.progress || 0;
       const isDelayed = task.delay_days > 0;
-      const barColor = isDelayed ? 'from-red-400 to-red-600' : (currentMode === 'plan' ? 'from-blue-400 to-blue-600' : 'from-emerald-400 to-emerald-600');
+      // 担当者ごとの色を使用
+      const assigneeName = task.assignee_name || '-';
+      const assigneeColor = getAssigneeColor(assigneeName);
+      const barColor = assigneeColor;
 
       barHtml = `
             <div class="task-bar bg-gradient-to-r ${barColor} absolute flex items-center text-white text-xs font-medium"
                  style="left: ${startOffset * CELL_WIDTH + 4}px; width: ${duration * CELL_WIDTH - 8}px; top: 8px;"
                  data-task-id="${task.id}"
                  data-parent-id="${task.parent_id || ''}"
+                 data-assignee="${esc(assigneeName)}"
                  data-start-date="${startDate}"
                  data-end-date="${endDate}"
-                 title="${esc(task.task_name)}${progress > 0 ? ' (' + progress + '%)' : ''}">
+                 title="${esc(task.task_name)}${assigneeName !== '-' ? ' [' + assigneeName + ']' : ''}${progress > 0 ? ' (' + progress + '%)' : ''}">
                 <div class="resize-handle resize-left"></div>
                 <span class="ml-2 truncate pointer-events-none">${esc(task.task_name)}</span>
                 ${progress > 0 ? `<span class="ml-1 pointer-events-none flex-shrink-0">${progress}%</span>` : ''}
@@ -1722,7 +1721,7 @@
     showToast('変更を元に戻しました', 'info');
   }
 
-  // 親タスクの日付を子タスクに合わせて更新
+  // 親タスクの日付を子タスクに合わせて更新（すべての子タスクの最小開始日・最大終了日を使用）
   function updateParentTaskDates(parentTaskId, childStartDate, childEndDate) {
     const parentBar = document.querySelector(`.task-bar[data-task-id="${parentTaskId}"]`);
     if (!parentBar) return;
@@ -1738,19 +1737,46 @@
     const parentEndDate = new Date(parentStartDate);
     parentEndDate.setDate(parentEndDate.getDate() + parentDuration - 1);
 
+    // すべての子タスクの日付を取得して最小開始日・最大終了日を計算
+    const childBars = document.querySelectorAll(`.task-bar[data-parent-id="${parentTaskId}"]`);
+    let minStartDate = null;
+    let maxEndDate = null;
+
+    childBars.forEach(childBar => {
+      const childLeft = parseInt(childBar.style.left) || 0;
+      const childWidth = parseInt(childBar.style.width) || 0;
+      const childStartOffset = Math.round((childLeft - 4) / CELL_WIDTH);
+      const childDuration = Math.round((childWidth + 8) / CELL_WIDTH);
+
+      const childStart = new Date(ganttStartDate);
+      childStart.setDate(childStart.getDate() + childStartOffset);
+      const childEnd = new Date(childStart);
+      childEnd.setDate(childEnd.getDate() + childDuration - 1);
+
+      if (minStartDate === null || childStart < minStartDate) {
+        minStartDate = new Date(childStart);
+      }
+      if (maxEndDate === null || childEnd > maxEndDate) {
+        maxEndDate = new Date(childEnd);
+      }
+    });
+
+    // 子タスクがない場合は更新不要
+    if (minStartDate === null || maxEndDate === null) return;
+
     let needsUpdate = false;
     let newParentStartDate = new Date(parentStartDate);
     let newParentEndDate = new Date(parentEndDate);
 
-    // 子の開始日が親の開始日より前の場合
-    if (childStartDate < parentStartDate) {
-      newParentStartDate = new Date(childStartDate);
+    // 親の開始日を子タスクの最小開始日に合わせる
+    if (minStartDate.getTime() !== parentStartDate.getTime()) {
+      newParentStartDate = new Date(minStartDate);
       needsUpdate = true;
     }
 
-    // 子の終了日が親の終了日より後の場合
-    if (childEndDate > parentEndDate) {
-      newParentEndDate = new Date(childEndDate);
+    // 親の終了日を子タスクの最大終了日に合わせる
+    if (maxEndDate.getTime() !== parentEndDate.getTime()) {
+      newParentEndDate = new Date(maxEndDate);
       needsUpdate = true;
     }
 
@@ -1813,14 +1839,40 @@
     taskRow.classList.add('task-row-modified');
   }
 
-  // 遅延日数を計算
-  function calculateDelayDays(plannedEndDate, today) {
-    const endDate = new Date(plannedEndDate);
-    endDate.setHours(0, 0, 0, 0);
+  // タスクの遅延日数を計算（初期表示用：サーバーサイドと同じロジック）
+  function calculateTaskDelayDays(task) {
+    const plannedEndDate = task.planned_end_date;
+    if (!plannedEndDate) {
+      return 0;
+    }
 
-    // 完了していない場合、今日との差分
-    const diffTime = today - endDate;
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    const status = task.status || '';
+    const progress = parseInt(task.progress) || 0;
+    const actualEndDate = task.actual_end_date;
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // 完了している場合は実績終了日と予定終了日を比較
+    if ((status === 'completed' || progress === 100) && actualEndDate) {
+      return calculateDelayDays(plannedEndDate, new Date(actualEndDate));
+    } else {
+      // 未完了の場合は今日と予定終了日を比較
+      return calculateDelayDays(plannedEndDate, today);
+    }
+  }
+
+  // 遅延日数を計算（年月日のみで比較、時刻・タイムゾーンの影響を排除）
+  function calculateDelayDays(plannedEndDate, referenceDate) {
+    // 年月日のみを取得してDateオブジェクトを作成
+    const end = plannedEndDate instanceof Date ? plannedEndDate : new Date(plannedEndDate);
+    const ref = referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+    const endDateOnly = new Date(end.getFullYear(), end.getMonth(), end.getDate());
+    const refDateOnly = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate());
+
+    // 日数の差を計算
+    const diffTime = refDateOnly.getTime() - endDateOnly.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;
   }
 

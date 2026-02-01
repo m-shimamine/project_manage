@@ -386,14 +386,17 @@ class TaskTableRenderer {
                     this.dataManager.updateTaskField(taskId, field, value);
                 }
 
-                // 日付フィールドの場合、一括日付更新機能に通知（フィールド名も渡す）
-                if (['planned_start_date', 'planned_end_date'].includes(field) && typeof window.onDateEdited === 'function') {
+                // 日付フィールドの場合の処理
+                if (['planned_start_date', 'planned_end_date'].includes(field)) {
+                    // 遅延日数を再計算して更新
+                    this.updateDelayBadgeForTask(taskId, row);
+
+                    // サブタスクの場合、親タスクの日付を同期
                     if (parentId) {
-                        // サブタスクの場合
-                        window.onDateEdited(parseInt(parentId), parseInt(taskId), field);
+                        this.syncParentTaskDates(parentId);
+                        window.onDateEdited && window.onDateEdited(parseInt(parentId), parseInt(taskId), field);
                     } else {
-                        // 親タスクの場合
-                        window.onDateEdited(parseInt(taskId), null, field);
+                        window.onDateEdited && window.onDateEdited(parseInt(taskId), null, field);
                     }
                 }
             };
@@ -503,6 +506,150 @@ class TaskTableRenderer {
         } else {
             return `<span class="delay-badge delay-early">${Math.abs(delayDays)}日先行</span>`;
         }
+    }
+
+    /**
+     * 遅延日数を計算
+     */
+    calculateDelayDays(plannedEndDate, status, progress, actualEndDate) {
+        if (!plannedEndDate) return 0;
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const plannedEnd = new Date(plannedEndDate);
+        plannedEnd.setHours(0, 0, 0, 0);
+
+        // 完了している場合は実績終了日と予定終了日を比較
+        if ((status === 'completed' || progress === 100) && actualEndDate) {
+            const actualEnd = new Date(actualEndDate);
+            actualEnd.setHours(0, 0, 0, 0);
+            return Math.round((actualEnd - plannedEnd) / (1000 * 60 * 60 * 24));
+        } else {
+            // 未完了の場合は今日と予定終了日を比較
+            return Math.round((today - plannedEnd) / (1000 * 60 * 60 * 24));
+        }
+    }
+
+    /**
+     * タスクの遅延バッジを更新
+     */
+    updateDelayBadgeForTask(taskId, row) {
+        if (!this.dataManager) return;
+
+        const task = this.dataManager.getTaskById(taskId);
+        if (!task) return;
+
+        // 現在の行から日付を取得（入力フィールドがある場合）
+        const plannedEndInput = row.querySelector('input[data-field="planned_end_date"]');
+        const plannedEnd = plannedEndInput ? plannedEndInput.value : task.planned_end_date;
+
+        const actualEndInput = row.querySelector('input[data-field="actual_end_date"]');
+        const actualEnd = actualEndInput ? actualEndInput.value : task.actual_end_date;
+
+        const statusSelect = row.querySelector('select[data-field="status"]');
+        const status = statusSelect ? statusSelect.value : task.status;
+
+        const progressInput = row.querySelector('input[data-field="progress"]');
+        const progress = progressInput ? parseInt(progressInput.value) || 0 : task.progress || 0;
+
+        // 遅延日数を計算
+        const delayDays = this.calculateDelayDays(plannedEnd, status, progress, actualEnd);
+
+        // DataManagerも更新
+        this.dataManager.updateTaskField(taskId, 'delay_days', delayDays);
+
+        // 遅延バッジセルを更新
+        const delayCells = row.querySelectorAll('td');
+        // 遅延は17番目のセル（0-indexed）- 編集モードでも同じ位置
+        if (delayCells.length > 17) {
+            delayCells[17].innerHTML = this.createDelayBadge(delayDays);
+        }
+    }
+
+    /**
+     * 親タスクの日付をサブタスクに合わせて同期
+     */
+    syncParentTaskDates(parentId) {
+        if (!this.dataManager) return;
+
+        const parentTask = this.dataManager.getTaskById(parentId);
+        if (!parentTask || !parentTask.subtasks || parentTask.subtasks.length === 0) return;
+
+        // サブタスクから最小開始日、最大終了日を取得
+        let minStartDate = null;
+        let maxEndDate = null;
+
+        parentTask.subtasks.forEach(subtask => {
+            // 現在の入力値も考慮（DOMから取得）
+            const subtaskRow = this.tableBody.querySelector(`tr[data-task-id="${subtask.id}"]`);
+            let startDate = subtask.planned_start_date;
+            let endDate = subtask.planned_end_date;
+
+            if (subtaskRow) {
+                const startInput = subtaskRow.querySelector('input[data-field="planned_start_date"]');
+                const endInput = subtaskRow.querySelector('input[data-field="planned_end_date"]');
+                if (startInput && startInput.value) startDate = startInput.value;
+                if (endInput && endInput.value) endDate = endInput.value;
+            }
+
+            if (startDate) {
+                const start = new Date(startDate);
+                if (!minStartDate || start < minStartDate) {
+                    minStartDate = start;
+                }
+            }
+            if (endDate) {
+                const end = new Date(endDate);
+                if (!maxEndDate || end > maxEndDate) {
+                    maxEndDate = end;
+                }
+            }
+        });
+
+        // 親タスクの行を更新
+        const parentRow = this.tableBody.querySelector(`tr[data-task-id="${parentId}"]`);
+        if (!parentRow) return;
+
+        let needsUpdate = false;
+
+        if (minStartDate) {
+            const startInput = parentRow.querySelector('input[data-field="planned_start_date"]');
+            const newStartDate = this.formatDateForInput(minStartDate);
+            if (startInput && startInput.value !== newStartDate) {
+                startInput.value = newStartDate;
+                this.dataManager.updateTaskField(parentId, 'planned_start_date', newStartDate);
+                needsUpdate = true;
+            }
+        }
+
+        if (maxEndDate) {
+            const endInput = parentRow.querySelector('input[data-field="planned_end_date"]');
+            const newEndDate = this.formatDateForInput(maxEndDate);
+            if (endInput && endInput.value !== newEndDate) {
+                endInput.value = newEndDate;
+                this.dataManager.updateTaskField(parentId, 'planned_end_date', newEndDate);
+                needsUpdate = true;
+            }
+        }
+
+        // 親タスクの遅延日数も更新
+        if (needsUpdate) {
+            this.updateDelayBadgeForTask(parentId, parentRow);
+            // 変更を記録（ハイライト表示）
+            parentRow.classList.add('modified');
+        }
+    }
+
+    /**
+     * 日付をinput[type=date]用にフォーマット
+     */
+    formatDateForInput(date) {
+        const d = date instanceof Date ? date : new Date(date);
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
     }
 
     /**

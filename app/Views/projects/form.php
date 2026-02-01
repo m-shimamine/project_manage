@@ -400,8 +400,9 @@ $statusLabels = [
                             <label class="block text-sm font-medium text-slate-700 mb-1.5">予算</label>
                             <div class="relative">
                                 <span class="absolute left-4 top-2.5 text-slate-400">¥</span>
-                                <input type="number" name="budget" id="field-budget" value="<?= esc($defaults['budget']) ?>" min="0" placeholder="予算を入力"
+                                <input type="text" id="field-budget-display" placeholder="予算を入力"
                                     class="w-full pl-8 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm transition-all <?= isset($fieldErrors['budget']) ? 'field-error' : '' ?>">
+                                <input type="hidden" name="budget" id="field-budget" value="<?= esc($defaults['budget']) ?>">
                             </div>
                             <?php if (isset($fieldErrors['budget'])): ?>
                             <div class="error-message"><i class="fas fa-exclamation-circle"></i><?= esc($fieldErrors['budget']) ?></div>
@@ -1101,6 +1102,45 @@ $(document).ready(function() {
     if (firstError.length) {
         firstError.focus();
     }
+
+    // ========================================
+    // 予算フィールドのカンマ区切り表示
+    // ========================================
+    var $budgetDisplay = $('#field-budget-display');
+    var $budgetHidden = $('#field-budget');
+
+    function formatBudget(value) {
+        if (!value || value === '') return '';
+        var num = parseInt(value.toString().replace(/,/g, ''), 10);
+        if (isNaN(num)) return '';
+        return num.toLocaleString('ja-JP');
+    }
+
+    // 初期値を設定（カンマ区切りで表示）
+    var initialBudget = $budgetHidden.val();
+    if (initialBudget) {
+        $budgetDisplay.val(formatBudget(initialBudget));
+    }
+
+    // フォーカス時はカンマなしの数値を表示
+    $budgetDisplay.on('focus', function() {
+        var value = $budgetHidden.val();
+        $(this).val(value);
+        $(this).select();
+    });
+
+    // 入力時は数字のみ許可
+    $budgetDisplay.on('input', function() {
+        var cleanValue = $(this).val().replace(/[^\d]/g, '');
+        $(this).val(cleanValue);
+        $budgetHidden.val(cleanValue);
+    });
+
+    // フォーカスを外したらカンマ区切りで表示
+    $budgetDisplay.on('blur', function() {
+        var value = $budgetHidden.val();
+        $(this).val(formatBudget(value));
+    });
 });
 } // end of initWhenReady
 

@@ -68,6 +68,7 @@ class TaskListApp {
             cancelEditBtn: document.getElementById('cancel-edit-btn'),
             saveAllBtn: document.getElementById('save-all-btn'),
             bulkDateBtn: document.getElementById('bulk-date-btn'),
+            costAllocationBtn: document.getElementById('cost-allocation-btn'),
 
             // 検索・フィルター
             searchPanel: document.getElementById('search-panel'),
@@ -510,6 +511,15 @@ class TaskListApp {
                 this.updateSelectedTaskForBulkDate(selectedIds);
             } else {
                 bulkDateBtn.classList.add('hidden');
+            }
+        }
+
+        // 原価割り振りボタンの表示制御（チェック時のみ表示）
+        if (this.elements.costAllocationBtn) {
+            if (this.isEditMode && count > 0) {
+                this.elements.costAllocationBtn.classList.remove('hidden');
+            } else {
+                this.elements.costAllocationBtn.classList.add('hidden');
             }
         }
     }

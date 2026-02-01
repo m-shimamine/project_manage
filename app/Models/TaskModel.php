@@ -164,6 +164,9 @@ class TaskModel extends Model
 
         $tasks = $builder->findAll();
 
+        // 画面表示用に遅延日数を本日基準で再計算
+        $tasks = $this->recalculateDelayDaysForDisplay($tasks);
+
         return $this->buildHierarchy($tasks);
     }
 
@@ -182,6 +185,9 @@ class TaskModel extends Model
             ->orderBy('p.name', 'ASC')
             ->orderBy('tasks.sort_order', 'ASC')
             ->findAll();
+
+        // 画面表示用に遅延日数を本日基準で再計算
+        $tasks = $this->recalculateDelayDaysForDisplay($tasks);
 
         // プロジェクト別にグループ化
         $grouped = [];
@@ -372,6 +378,38 @@ class TaskModel extends Model
         }
 
         return false;
+    }
+
+    /**
+     * 画面表示用に遅延日数を本日基準で再計算（DBは更新しない）
+     */
+    public function recalculateDelayDaysForDisplay(array $tasks): array
+    {
+        $today = date('Y-m-d');
+
+        foreach ($tasks as &$task) {
+            if (empty($task['planned_end_date'])) {
+                $task['delay_days'] = 0;
+                continue;
+            }
+
+            $plannedEnd = $task['planned_end_date'];
+            $actualEnd = $task['actual_end_date'] ?? null;
+            $status = $task['status'] ?? '';
+            $progress = (int)($task['progress'] ?? 0);
+
+            // 完了している場合は実績終了日と予定終了日を比較
+            if (($status === 'completed' || $progress === 100) && $actualEnd) {
+                $delay = (strtotime($actualEnd) - strtotime($plannedEnd)) / 86400;
+            } else {
+                // 未完了の場合は今日と予定終了日を比較
+                $delay = (strtotime($today) - strtotime($plannedEnd)) / 86400;
+            }
+
+            $task['delay_days'] = (int) round($delay);
+        }
+
+        return $tasks;
     }
 
     /**

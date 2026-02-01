@@ -561,7 +561,19 @@ async function loadTaskData(taskId) {
             const task = result.data;
             document.getElementById('task-name').value = task.task_name || '';
             document.getElementById('task-process').value = task.process_id || '';
-            document.getElementById('task-assignee').value = task.assignee_id || '';
+
+            // 担当者をセット（セレクトボックスにオプションがない場合は追加）
+            const assigneeSelect = document.getElementById('task-assignee');
+            if (task.assignee_id) {
+                const optionExists = Array.from(assigneeSelect.options).some(opt => opt.value == task.assignee_id);
+                if (!optionExists && task.assignee_name) {
+                    const newOption = document.createElement('option');
+                    newOption.value = task.assignee_id;
+                    newOption.textContent = task.assignee_name + ' (プロジェクト外)';
+                    assigneeSelect.appendChild(newOption);
+                }
+            }
+            assigneeSelect.value = task.assignee_id || '';
             document.getElementById('task-status').value = task.status || 'not_started';
             document.getElementById('task-planned-start').value = task.planned_start_date || '';
             document.getElementById('task-planned-end').value = task.planned_end_date || '';

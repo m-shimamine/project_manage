@@ -60,16 +60,26 @@ class ScheduleController extends BaseController
         // 工程マスタ（アクティブのみ）
         $processes = $this->processModel->getActiveProcessMasters();
 
-        // メンバー一覧（プロジェクト選択時はプロジェクト参加者のみ）
+        // メンバー一覧（プロジェクト選択時はプロジェクト参加者+リーダーのみ）
         $allMembers = $this->memberModel->getActiveMembers();
-        if (!$isAllProjects && $selectedProject && !empty($selectedProject['members'])) {
-            // プロジェクト参加者のIDリスト
-            $projectMemberIds = $selectedProject['members'];
-            // 参加者のみをフィルタリング
-            $members = array_filter($allMembers, function ($member) use ($projectMemberIds) {
-                return in_array($member['id'], $projectMemberIds);
-            });
-            $members = array_values($members); // インデックスを振り直し
+        if (!$isAllProjects && $selectedProject) {
+            // プロジェクト参加者の名前リスト
+            $projectMemberNames = $selectedProject['members'] ?? [];
+            // プロジェクトリーダーも追加
+            if (!empty($selectedProject['project_leader'])) {
+                $projectMemberNames[] = $selectedProject['project_leader'];
+            }
+            $projectMemberNames = array_unique($projectMemberNames);
+
+            if (!empty($projectMemberNames)) {
+                // 参加者のみをフィルタリング（名前で比較）
+                $members = array_filter($allMembers, function ($member) use ($projectMemberNames) {
+                    return in_array($member['name'], $projectMemberNames, true);
+                });
+                $members = array_values($members); // インデックスを振り直し
+            } else {
+                $members = $allMembers;
+            }
         } else {
             $members = $allMembers;
         }
@@ -125,16 +135,26 @@ class ScheduleController extends BaseController
         // 工程マスタ（アクティブのみ）
         $processes = $this->processModel->getActiveProcessMasters();
 
-        // メンバー一覧（プロジェクト選択時はプロジェクト参加者のみ）
+        // メンバー一覧（プロジェクト選択時はプロジェクト参加者+リーダーのみ）
         $allMembers = $this->memberModel->getActiveMembers();
-        if (!$isAllProjects && $selectedProject && !empty($selectedProject['members'])) {
-            // プロジェクト参加者のIDリスト
-            $projectMemberIds = $selectedProject['members'];
-            // 参加者のみをフィルタリング
-            $members = array_filter($allMembers, function ($member) use ($projectMemberIds) {
-                return in_array($member['id'], $projectMemberIds);
-            });
-            $members = array_values($members); // インデックスを振り直し
+        if (!$isAllProjects && $selectedProject) {
+            // プロジェクト参加者の名前リスト
+            $projectMemberNames = $selectedProject['members'] ?? [];
+            // プロジェクトリーダーも追加
+            if (!empty($selectedProject['project_leader'])) {
+                $projectMemberNames[] = $selectedProject['project_leader'];
+            }
+            $projectMemberNames = array_unique($projectMemberNames);
+
+            if (!empty($projectMemberNames)) {
+                // 参加者のみをフィルタリング（名前で比較）
+                $members = array_filter($allMembers, function ($member) use ($projectMemberNames) {
+                    return in_array($member['name'], $projectMemberNames, true);
+                });
+                $members = array_values($members); // インデックスを振り直し
+            } else {
+                $members = $allMembers;
+            }
         } else {
             $members = $allMembers;
         }

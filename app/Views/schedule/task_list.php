@@ -531,16 +531,18 @@
                 <span><i class="fas fa-spinner mr-1 text-blue-500"></i>進行中: <strong class="text-blue-600" id="progress-count"><?= $taskStats['in_progress'] ?? 0 ?>件</strong></span>
                 <span><i class="fas fa-clock mr-1 text-slate-400"></i>未着手: <strong class="text-slate-600" id="notstarted-count"><?= $taskStats['not_started'] ?? 0 ?>件</strong></span>
                 <span class="border-l border-slate-300 pl-4"><i class="fas fa-exclamation-triangle mr-1 text-rose-500"></i>遅延: <strong class="text-rose-600" id="delayed-count"><?= $taskStats['delayed'] ?? 0 ?>件</strong></span>
+                <?php if (!empty($selectedProject)): ?>
+                <span class="border-l border-slate-300 pl-4"><i class="fas fa-yen-sign mr-1 text-green-600"></i>予算: <strong class="text-green-700" id="budget-amount"><?= number_format($selectedProject['budget'] ?? 0) ?>円</strong></span>
+                <?php endif; ?>
             </div>
             <div class="flex items-center space-x-3">
-                <!-- モードインジケーター -->
-                <span id="view-mode-indicator" class="bg-slate-500 text-white px-3 py-1 rounded text-xs font-medium">
-                    <i class="fas fa-eye mr-1"></i>表示モード
-                </span>
-                <span id="edit-mode-indicator" class="hidden bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium">
-                    <i class="fas fa-edit mr-1"></i>編集モード
-                </span>
                 <!-- 編集モード時のボタン群 -->
+                <!-- 原価割り振りボタン（チェック時に表示） -->
+                <?php if (!empty($selectedProject)): ?>
+                <button id="cost-allocation-btn" onclick="openCostAllocationModal()" class="hidden px-3 py-1.5 border border-green-400 rounded-lg text-xs font-medium text-green-700 hover:bg-green-50 bg-green-50">
+                    <i class="fas fa-calculator mr-1"></i>原価割り振り
+                </button>
+                <?php endif; ?>
                 <button id="bulk-date-btn" onclick="openBulkDateModal()" class="hidden px-3 py-1.5 border border-amber-400 rounded-lg text-xs font-medium text-amber-700 hover:bg-amber-50 bg-amber-50">
                     <i class="fas fa-calendar-alt mr-1"></i>一括日付更新
                 </button>
@@ -553,6 +555,14 @@
                 <button onclick="saveAllTasks()" id="save-all-btn" class="hidden px-4 py-1.5 bg-gradient-to-r from-rose-500 to-red-600 text-white rounded-lg text-xs font-semibold hover:from-rose-600 hover:to-red-700 shadow-lg transition-all">
                     <i class="fas fa-save mr-1"></i>変更を登録
                 </button>
+                <!-- モードインジケーター（右端） -->
+                <span class="border-l border-slate-300 h-6"></span>
+                <span id="view-mode-indicator" class="bg-slate-500 text-white px-3 py-1 rounded text-xs font-medium">
+                    <i class="fas fa-eye mr-1"></i>表示モード
+                </span>
+                <span id="edit-mode-indicator" class="hidden bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium">
+                    <i class="fas fa-edit mr-1"></i>編集モード
+                </span>
             </div>
         </div>
     </footer>
@@ -878,6 +888,82 @@
     </div>
 </div>
 
+<!-- 原価割り振りモーダル -->
+<div id="cost-allocation-modal" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeCostAllocationModal()"></div>
+    <div class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden">
+        <div class="bg-gradient-to-r from-green-600 to-emerald-600 px-6 py-4">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-bold text-white"><i class="fas fa-calculator mr-2"></i>原価割り振り</h3>
+                <button onclick="closeCostAllocationModal()" class="text-white/80 hover:text-white transition-colors">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div class="mb-6 p-4 bg-green-50 rounded-lg border border-green-200">
+                <div class="grid grid-cols-3 gap-4 text-sm mb-3">
+                    <div>
+                        <span class="text-slate-600">プロジェクト予算:</span>
+                        <span class="font-bold text-green-700 ml-2" id="modal-budget"><?= isset($selectedProject['budget']) ? number_format($selectedProject['budget']) : 0 ?>円</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-600">完了分:</span>
+                        <span class="font-bold text-slate-500 ml-2" id="modal-completed-cost">0円</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-600">確定分:</span>
+                        <span class="font-bold text-orange-600 ml-2" id="modal-fixed-cost">0円</span>
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4 text-sm pt-3 border-t border-green-200">
+                    <div>
+                        <span class="text-slate-600">残予算:</span>
+                        <span class="font-bold text-emerald-700 ml-2" id="modal-remaining-budget">0円</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-600">総予定工数:</span>
+                        <span class="font-bold text-blue-700 ml-2" id="modal-total-man-days">0日</span>
+                    </div>
+                    <div>
+                        <span class="text-slate-600">工数単価:</span>
+                        <span class="font-bold text-amber-700 ml-2" id="modal-unit-cost">0円/日</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mb-4">
+                <p class="text-sm text-slate-600 mb-2">
+                    <i class="fas fa-info-circle text-blue-500 mr-1"></i>
+                    予算から完了分・確定分を差し引いた残予算を、チェックしたタスクの工数で按分します。
+                </p>
+                <p class="text-sm text-amber-600">
+                    <i class="fas fa-exclamation-triangle mr-1"></i>
+                    完了分=完了済みタスク、確定分=チェックしていない未完了タスク
+                </p>
+            </div>
+            <div class="mb-4 max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
+                <table class="w-full text-sm">
+                    <thead class="sticky top-0 bg-slate-100">
+                        <tr>
+                            <th class="px-3 py-2 text-left text-slate-600">タスク名</th>
+                            <th class="px-3 py-2 text-center text-slate-600">予定工数</th>
+                            <th class="px-3 py-2 text-center text-slate-600">現在原価</th>
+                            <th class="px-3 py-2 text-center text-slate-600">→ 新原価</th>
+                        </tr>
+                    </thead>
+                    <tbody id="cost-allocation-preview"></tbody>
+                </table>
+            </div>
+        </div>
+        <div class="border-t border-slate-200 px-6 py-4 flex justify-end space-x-3 bg-slate-50">
+            <button onclick="closeCostAllocationModal()" class="px-5 py-2.5 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors">キャンセル</button>
+            <button onclick="executeCostAllocation()" class="px-5 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg text-sm font-semibold hover:from-green-700 hover:to-emerald-700 shadow-lg transition-all">
+                <i class="fas fa-check mr-2"></i>割り振り実行
+            </button>
+        </div>
+    </div>
+</div>
+
 <!-- 終了タスク選択モーダル -->
 <div id="end-task-select-modal" class="fixed inset-0 z-[60] hidden">
     <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeEndTaskSelectModal()"></div>
@@ -909,6 +995,21 @@
 
 <!-- タスク編集モーダル -->
 <?= $this->include('schedule/partials/task_modal') ?>
+
+<!-- ローディングオーバーレイ -->
+<div id="loading-overlay" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center opacity-0 pointer-events-none transition-opacity duration-200">
+    <div class="bg-white rounded-2xl shadow-2xl px-8 py-6 flex items-center space-x-4">
+        <div class="animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
+        <span id="loading-message" class="text-slate-700 font-medium">処理中...</span>
+    </div>
+</div>
+
+<style>
+#loading-overlay.show {
+    opacity: 1;
+    pointer-events: auto;
+}
+</style>
 
 <?= $this->endSection() ?>
 
@@ -1638,7 +1739,19 @@ async function loadTaskData(taskId) {
             const task = result.data;
             document.getElementById('task-name').value = task.task_name || '';
             document.getElementById('task-process').value = task.process_id || '';
-            document.getElementById('task-assignee').value = task.assignee_id || '';
+
+            // 担当者をセット（セレクトボックスにオプションがない場合は追加）
+            const assigneeSelect = document.getElementById('task-assignee');
+            if (task.assignee_id) {
+                const optionExists = Array.from(assigneeSelect.options).some(opt => opt.value == task.assignee_id);
+                if (!optionExists && task.assignee_name) {
+                    const newOption = document.createElement('option');
+                    newOption.value = task.assignee_id;
+                    newOption.textContent = task.assignee_name + ' (プロジェクト外)';
+                    assigneeSelect.appendChild(newOption);
+                }
+            }
+            assigneeSelect.value = task.assignee_id || '';
             document.getElementById('task-status').value = task.status || 'not_started';
             document.getElementById('task-planned-start').value = task.planned_start_date || '';
             document.getElementById('task-planned-end').value = task.planned_end_date || '';
@@ -1852,6 +1965,204 @@ function openBulkDateModal() {
 
 function closeBulkDateModal() {
     document.getElementById('bulk-date-modal').classList.add('hidden');
+}
+
+// HTMLエスケープ
+function escapeHtml(str) {
+    if (!str) return '';
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// ローディング表示
+function showLoading(message = '処理中...') {
+    document.getElementById('loading-message').textContent = message;
+    document.getElementById('loading-overlay').classList.add('show');
+}
+
+// ローディング非表示
+function hideLoading() {
+    document.getElementById('loading-overlay').classList.remove('show');
+}
+
+// 原価割り振りモーダルを開く
+function openCostAllocationModal() {
+    const modal = document.getElementById('cost-allocation-modal');
+    if (!modal) return;
+
+    const budget = <?= $selectedProject['budget'] ?? 0 ?>;
+    const tasks = taskListApp.dataManager.getTasks();
+
+    // チェックされたタスクIDを取得
+    const selectedIds = taskListApp.tableRenderer.getSelectedTaskIds();
+    if (selectedIds.length === 0) {
+        showToast('対象タスクをチェックしてください', 'warning');
+        return;
+    }
+
+    // 予算が0の場合は警告
+    if (!budget || budget <= 0) {
+        showToast('プロジェクトに予算が設定されていません', 'warning');
+        return;
+    }
+
+    // 完了タスクの原価を集計（予算から差し引く分）
+    let completedCost = 0;
+    // チェックされていない未完了タスクの原価を集計（確定分として予算から差し引く）
+    let fixedCost = 0;
+
+    tasks.forEach(task => {
+        const isSelected = selectedIds.includes(String(task.id));
+        const isCompleted = task.progress >= 100 || task.status === 'completed';
+
+        if (isCompleted) {
+            // 完了タスク
+            completedCost += parseFloat(task.planned_cost) || 0;
+        } else if (!isSelected) {
+            // チェックされていない未完了タスク（確定分）
+            fixedCost += parseFloat(task.planned_cost) || 0;
+        }
+
+        // サブタスクもチェック
+        if (task.subtasks) {
+            task.subtasks.forEach(subtask => {
+                const isSubSelected = selectedIds.includes(String(subtask.id));
+                const isSubCompleted = subtask.progress >= 100 || subtask.status === 'completed';
+
+                if (isSubCompleted) {
+                    completedCost += parseFloat(subtask.planned_cost) || 0;
+                } else if (!isSubSelected) {
+                    fixedCost += parseFloat(subtask.planned_cost) || 0;
+                }
+            });
+        }
+    });
+
+    // 残予算を計算（完了分と確定分を差し引く）
+    const remainingBudget = Math.max(0, budget - completedCost - fixedCost);
+
+    // チェックされたタスク（進捗100%以外かつ完了ステータス以外）を抽出
+    let targetTasks = [];
+    tasks.forEach(task => {
+        // 親タスクがチェックされている場合
+        if (selectedIds.includes(String(task.id))) {
+            if (task.progress < 100 && task.status !== 'completed' && task.planned_man_days > 0) {
+                targetTasks.push({
+                    id: task.id,
+                    name: task.task_name,
+                    manDays: parseFloat(task.planned_man_days) || 0,
+                    currentCost: parseFloat(task.planned_cost) || 0,
+                    isSubtask: false
+                });
+            }
+        }
+        // サブタスクもチェック
+        if (task.subtasks) {
+            task.subtasks.forEach(subtask => {
+                if (selectedIds.includes(String(subtask.id))) {
+                    if (subtask.progress < 100 && subtask.status !== 'completed' && subtask.planned_man_days > 0) {
+                        targetTasks.push({
+                            id: subtask.id,
+                            name: '└ ' + subtask.task_name,
+                            manDays: parseFloat(subtask.planned_man_days) || 0,
+                            currentCost: parseFloat(subtask.planned_cost) || 0,
+                            isSubtask: true
+                        });
+                    }
+                }
+            });
+        }
+    });
+
+    // 総工数計算（残予算を使用）
+    const totalManDays = targetTasks.reduce((sum, t) => sum + t.manDays, 0);
+    const unitCost = totalManDays > 0 ? Math.floor(remainingBudget / totalManDays) : 0;
+
+    // 表示を更新
+    document.getElementById('modal-completed-cost').textContent = completedCost.toLocaleString() + '円';
+    document.getElementById('modal-fixed-cost').textContent = fixedCost.toLocaleString() + '円';
+    document.getElementById('modal-remaining-budget').textContent = remainingBudget.toLocaleString() + '円';
+    document.getElementById('modal-total-man-days').textContent = totalManDays.toFixed(1) + '日';
+    document.getElementById('modal-unit-cost').textContent = unitCost.toLocaleString() + '円/日';
+
+    // プレビュー生成
+    const previewBody = document.getElementById('cost-allocation-preview');
+    previewBody.innerHTML = '';
+
+    if (targetTasks.length === 0) {
+        previewBody.innerHTML = '<tr><td colspan="4" class="px-3 py-4 text-center text-slate-500">対象タスクがありません（完了済みか工数未設定）</td></tr>';
+    } else {
+        targetTasks.forEach(task => {
+            const newCost = Math.floor(task.manDays * unitCost);
+            const row = document.createElement('tr');
+            row.className = 'border-b border-slate-100';
+            row.innerHTML = `
+                <td class="px-3 py-2 ${task.isSubtask ? 'text-slate-500' : 'text-slate-700'}">${escapeHtml(task.name)}</td>
+                <td class="px-3 py-2 text-center">${task.manDays}日</td>
+                <td class="px-3 py-2 text-center text-slate-500">${task.currentCost.toLocaleString()}円</td>
+                <td class="px-3 py-2 text-center font-medium text-green-700">${newCost.toLocaleString()}円</td>
+            `;
+            previewBody.appendChild(row);
+        });
+    }
+
+    // モーダルにデータを保存
+    modal.dataset.targetTasks = JSON.stringify(targetTasks);
+    modal.dataset.unitCost = unitCost;
+
+    modal.classList.remove('hidden');
+}
+
+function closeCostAllocationModal() {
+    document.getElementById('cost-allocation-modal').classList.add('hidden');
+}
+
+// 原価割り振り実行
+async function executeCostAllocation() {
+    const modal = document.getElementById('cost-allocation-modal');
+    const targetTasks = JSON.parse(modal.dataset.targetTasks || '[]');
+    const unitCost = parseFloat(modal.dataset.unitCost) || 0;
+
+    if (targetTasks.length === 0) {
+        showToast('対象タスクがありません', 'warning');
+        return;
+    }
+
+    showLoading('原価を更新中...');
+
+    try {
+        // 各タスクの原価を更新
+        const updates = targetTasks.map(task => ({
+            id: task.id,
+            planned_cost: Math.floor(task.manDays * unitCost)
+        }));
+
+        const response = await fetch('<?= base_url('api/tasks/bulk-update') ?>', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: JSON.stringify({ tasks: updates })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            hideLoading();
+            closeCostAllocationModal();
+            showToast(`${updates.length}件のタスクの原価を更新しました`, 'success');
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            hideLoading();
+            showToast(result.error || '更新に失敗しました', 'error');
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        hideLoading();
+        showToast('通信エラーが発生しました', 'error');
+    }
 }
 
 // 終了タスク選択モーダルを開く

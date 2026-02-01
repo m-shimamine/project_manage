@@ -134,7 +134,7 @@ $statusColor = \App\Models\ProjectModel::getStatusColor($project['status']);
                     </div>
                     <div class="flex items-center justify-between py-2">
                         <span class="text-sm text-slate-500">予算</span>
-                        <span class="text-sm font-medium text-slate-800"><?= !empty($project['budget']) ? '¥' . number_format($project['budget']) : '-' ?></span>
+                        <span class="text-sm font-medium text-slate-800"><?= isset($project['budget']) && $project['budget'] !== null && $project['budget'] !== '' ? '¥' . number_format((float)$project['budget']) : '-' ?></span>
                     </div>
                 </div>
             </div>
